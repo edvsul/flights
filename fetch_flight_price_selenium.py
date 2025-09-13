@@ -206,6 +206,68 @@ def scrape_skyscanner_selenium():
         if driver:
             driver.quit()
 
+def scrape_skyscanner_requests():
+    """Fallback method for Skyscanner using requests when Selenium fails"""
+    try:
+        print("🔄 Trying Skyscanner requests fallback...")
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+        }
+
+        # Try multiple Skyscanner URLs
+        urls = [
+            "https://www.skyscanner.com/transport/flights/cph/ayt/251017/251024/?adults=1&cabinclass=economy&rtn=1",
+            "https://www.skyscanner.net/transport/flights/cph/ayt/251017/251024/?adults=1&currency=EUR",
+            "https://www.skyscanner.com/transport/flights/cph/ayt/?adults=1&cabinclass=economy"
+        ]
+
+        for url in urls:
+            try:
+                logger.info(f"Trying Skyscanner requests with URL: {url}")
+                response = requests.get(url, headers=headers, timeout=30)
+
+                if response.status_code == 200:
+                    save_debug_html(response.text, "skyscanner_requests")
+
+                    # Look for price patterns
+                    price_patterns = [
+                        r'€\s*\d{2,4}',
+                        r'EUR\s*\d{2,4}',
+                        r'\d{2,4}\s*€',
+                        r'\d{2,4}\s*EUR',
+                    ]
+
+                    for pattern in price_patterns:
+                        matches = re.findall(pattern, response.text, re.IGNORECASE)
+                        if matches:
+                            valid_prices = []
+                            for match in matches:
+                                price_num = int(re.search(r'\d+', str(match)).group())
+                                if 50 <= price_num <= 2000:
+                                    valid_prices.append(f"€{price_num}")
+
+                            if valid_prices:
+                                price = valid_prices[0]
+                                logger.info(f"Skyscanner requests found price: {price}")
+                                return f"{price} (Skyscanner-Requests)", "Skyscanner Requests"
+
+            except Exception as e:
+                logger.error(f"Skyscanner requests error for {url}: {e}")
+                continue
+
+        logger.warning("Skyscanner requests: No prices found")
+        return "No prices found", "Skyscanner Requests No Prices"
+
+    except Exception as e:
+        logger.error(f"Skyscanner requests fallback error: {e}")
+        return f"Error: {str(e)}", "Skyscanner Requests Error"
+
 def fetch_flight_price_skyscanner_only(country):
     """Fetch flight prices from Skyscanner only using Selenium"""
 
@@ -225,6 +287,18 @@ def fetch_flight_price_skyscanner_only(country):
                 logger.info(f"Skyscanner returned: {price} (no currency found)")
         else:
             logger.info(f"Skyscanner returned: {price} via {method}")
+
+        # Fallback to requests if Selenium fails
+        print("🔄 Fallback to Skyscanner requests...")
+        price, method = scrape_skyscanner_requests()
+        if price and method and "error" not in price.lower() and "failed" not in method.lower():
+            if any(currency in price for currency in ['€', '$', '£']):
+                logger.info(f"SUCCESS with Skyscanner requests: {price}")
+                return price, method
+            else:
+                logger.info(f"Skyscanner requests returned: {price} (no currency found)")
+        else:
+            logger.info(f"Skyscanner requests returned: {price} via {method}")
 
     except Exception as e:
         logger.error(f"Skyscanner failed: {e}")
