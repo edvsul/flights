@@ -8,6 +8,7 @@ import os
 import random
 import logging
 import re
+import json
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -46,19 +47,17 @@ def save_debug_html(content, filename):
         logger.info(f"Debug HTML saved to debug_{filename}.html")
 
 def scrape_skyscanner_requests():
-    """Enhanced method for Skyscanner using requests with anti-detection"""
     try:
-        print("🔄 Trying enhanced Skyscanner requests...")
-
-        # Create session for cookie persistence
+        print("🔄 Trying enhanced Skyscanner requests with API discovery...")
         session = requests.Session()
 
-        # Enhanced headers with more realistic fingerprint
+        # Enhanced headers with more realistic browser fingerprinting
         headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
             'Accept-Language': 'en-US,en;q=0.9,de;q=0.8',
-            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
+            'DNT': '1',
             'Connection': 'keep-alive',
             'Upgrade-Insecure-Requests': '1',
             'Sec-Fetch-Dest': 'document',
@@ -66,44 +65,72 @@ def scrape_skyscanner_requests():
             'Sec-Fetch-Site': 'none',
             'Sec-Fetch-User': '?1',
             'Cache-Control': 'max-age=0',
-            'DNT': '1',
-            'Sec-CH-UA': '"Not_A Brand";v="8", "Chromium";v="140", "Google Chrome";v="140"',
-            'Sec-CH-UA-Mobile': '?0',
-            'Sec-CH-UA-Platform': '"macOS"'
+            'sec-ch-ua': '"Chromium";v="140", "Google Chrome";v="140", "Not?A_Brand";v="99"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"macOS"'
         }
-
         session.headers.update(headers)
 
-        # First, visit homepage to establish session
-        print("🌐 Establishing session via homepage...")
-        try:
-            homepage_response = session.get("https://www.skyscanner.net", timeout=15)
+        # Step 1: Establish session via homepage
+        print("🏠 Establishing session via homepage...")
+        homepage_response = session.get("https://www.skyscanner.net", timeout=15)
+        if homepage_response.status_code != 200:
+            return "Homepage access failed", "Session establishment error"
 
-            # Check for CAPTCHA on homepage
-            if homepage_response.status_code == 200:
-                content_lower = homepage_response.text.lower()
-                captcha_indicators = ['captcha', 'are you a person or a robot', 'perimeterx', 'px-captcha', 'human verification', 'access denied']
+        # Check for CAPTCHA on homepage
+        if any(indicator in homepage_response.text.lower() for indicator in ['captcha', 'perimeterx', 'px-captcha']):
+            print("❌ CAPTCHA detected on homepage!")
+            return "CAPTCHA detected", "Homepage blocked"
 
-                if any(indicator in content_lower for indicator in captcha_indicators):
-                    print("❌ CAPTCHA detected on homepage via requests!")
-                    save_debug_html(homepage_response.text, "captcha_homepage_requests")
-                    return "CAPTCHA detected on homepage", "Requests CAPTCHA"
+        # Step 2: Try API endpoints first (most reliable)
+        api_endpoints = [
+            # Modern Skyscanner API endpoints
+            "https://www.skyscanner.net/g/conductor/v1/fps3/search/?adults=1&cabinClass=economy&currency=EUR&locale=en-US&locationSchema=sky&market=US&destinationEntityId=95673612&originEntityId=95673519&outboundDate=2025-10-17&inboundDate=2025-10-24",
+            "https://www.skyscanner.net/api/v1/flights/browse/browsequotes/v1.0/US/EUR/en-US/CPH-sky/AYT-sky/2025-10-17/2025-10-24?adults=1&children=0&infants=0&cabinclass=Economy",
+            "https://www.skyscanner.de/g/chiron/api/v1/prices/search?adults=1&cabinClass=economy&currency=EUR&locale=de-DE&market=DE&destinationEntityId=95673612&originEntityId=95673519&outboundDate=2025-10-17&inboundDate=2025-10-24",
+        ]
 
-                print("✅ Homepage loaded successfully")
-            else:
-                print(f"⚠️  Homepage returned status: {homepage_response.status_code}")
+        for i, api_url in enumerate(api_endpoints):
+            try:
+                print(f"🔍 Trying API endpoint {i+1}/{len(api_endpoints)}")
 
-        except Exception as e:
-            logger.warning(f"Homepage visit failed: {e}")
+                # Update headers for API calls
+                api_headers = session.headers.copy()
+                api_headers.update({
+                    'Accept': 'application/json, text/plain, */*',
+                    'Referer': 'https://www.skyscanner.net/',
+                    'X-Requested-With': 'XMLHttpRequest'
+                })
 
-        # Human-like delay
+                api_response = session.get(api_url, headers=api_headers, timeout=30)
+                print(f"API response status: {api_response.status_code}")
+
+                if api_response.status_code == 200:
+                    try:
+                        api_data = api_response.json()
+                        print(f"✅ Got JSON response from API endpoint {i+1}")
+
+                        # Extract prices from API response
+                        price = extract_price_from_api_response(api_data)
+                        if price:
+                            return price, f"API endpoint {i+1}"
+
+                    except json.JSONDecodeError:
+                        print(f"❌ API endpoint {i+1} returned non-JSON data")
+                        continue
+
+            except Exception as e:
+                print(f"❌ API endpoint {i+1} failed: {e}")
+                continue
+
+        # Step 3: Enhanced web scraping with multiple strategies
         time.sleep(random.uniform(2, 5))
 
         # Try multiple Skyscanner URLs with different strategies
         urls = [
             "https://www.skyscanner.net/transport/flights/cph/ayt/251017/251024/?adults=1&currency=EUR",
             "https://www.skyscanner.com/transport/flights/cph/ayt/251017/251024/?adults=1&cabinclass=economy&rtn=1",
-            "https://www.skyscanner.de/transport/fluge/cph/ayt/?adults=1&cabinclass=economy",
+            "https://www.skyscanner.de/transport/fluge/cph/ayt/251017/251024/?adults=1&cabinclass=economy&rtn=1",
             "https://www.skyscanner.net/transport/flights/cph/ayt/?adults=1&currency=EUR"
         ]
 
@@ -136,108 +163,204 @@ def scrape_skyscanner_requests():
 
                     save_debug_html(response.text, f"skyscanner_requests_url_{i+1}")
 
-                    # Parse HTML with BeautifulSoup
-                    soup = BeautifulSoup(response.text, 'html.parser')
+                    # Enhanced price extraction strategies
+                    price = extract_price_from_html_enhanced(response.text)
+                    if price:
+                        return price, f"Enhanced HTML extraction URL {i+1}"
 
-                    # Enhanced JSON data extraction from script tags
-                    script_tags = soup.find_all('script')
-                    for script in script_tags:
-                        if script.string and len(script.string) > 100:  # Only check substantial scripts
-                            script_content = script.string.lower()
-                            if any(keyword in script_content for keyword in ['price', 'eur', 'amount', 'cost']):
-                                # Multiple JSON price extraction patterns
-                                json_patterns = [
-                                    r'"price"[^}]*?(\d{2,4})',
-                                    r'"EUR"[^}]*?(\d{2,4})',
-                                    r'"currency":"EUR"[^}]*?"amount":(\d{2,4})',
-                                    r'"amount":(\d{2,4})[^}]*?"currency":"EUR"',
-                                    r'"value":(\d{2,4})[^}]*?"currency":"EUR"',
-                                    r'"totalPrice":(\d{2,4})',
-                                    r'"basePrice":(\d{2,4})'
-                                ]
-
-                                for pattern in json_patterns:
-                                    json_prices = re.findall(pattern, script.string)
-                                    if json_prices:
-                                        for price_str in json_prices:
-                                            try:
-                                                price_num = int(price_str)
-                                                # More restrictive price range to avoid false positives
-                                                if 100 <= price_num <= 1500:  # Realistic flight price range
-                                                    price = f"€{price_num}"
-                                                    logger.info(f"Skyscanner requests found price in JSON: {price}")
-                                                    return f"{price} (Skyscanner-Requests-JSON)", "Skyscanner Requests JSON"
-                                            except ValueError:
-                                                continue
-
-                    # Enhanced HTML text price patterns with better validation
-                    price_patterns = [
-                        r'€\s*(\d{2,4})',
-                        r'EUR\s*(\d{2,4})',
-                        r'(\d{2,4})\s*€',
-                        r'(\d{2,4})\s*EUR',
-                        # German specific patterns
-                        r'ab\s*€\s*(\d{2,4})',
-                        r'von\s*€\s*(\d{2,4})',
-                        # English patterns
-                        r'from\s*€\s*(\d{2,4})',
-                        r'starting\s*at\s*€\s*(\d{2,4})',
-                    ]
-
-                    found_prices = []
-                    for pattern in price_patterns:
-                        matches = re.findall(pattern, response.text, re.IGNORECASE)
-                        if matches:
-                            for match in matches:
-                                try:
-                                    price_num = int(match)
-                                    # More restrictive validation - avoid common false positives
-                                    if 100 <= price_num <= 1500 and price_num not in [2000, 1000]:  # Exclude common false positives
-                                        found_prices.append(price_num)
-                                except ValueError:
-                                    continue
-
-                    if found_prices:
-                        # Remove duplicates, sort, and take the lowest reasonable price
-                        unique_prices = sorted(list(set(found_prices)))
-                        # Filter out prices that are too high or common false positives
-                        realistic_prices = [p for p in unique_prices if p < 1000]
-
-                        if realistic_prices:
-                            price = f"€{realistic_prices[0]}"
-                            logger.info(f"Skyscanner requests found realistic price: {price}")
-                            return f"{price} (Skyscanner-Requests)", "Skyscanner Requests"
-                        elif unique_prices:
-                            # If no realistic prices, take the lowest available but flag it
-                            price = f"€{unique_prices[0]}"
-                            logger.warning(f"Skyscanner requests found high price (possible false positive): {price}")
-                            return f"{price} (Skyscanner-Requests-HighPrice)", "Skyscanner Requests High"
-
-                elif response.status_code == 403:
-                    print(f"❌ Access denied (403) for URL {i+1}")
-                    save_debug_html(response.text, f"access_denied_url_{i+1}")
-                    continue
-                elif response.status_code == 429:
-                    print(f"❌ Rate limited (429) for URL {i+1}")
-                    # Longer delay for rate limiting
-                    time.sleep(random.uniform(10, 20))
-                    continue
-                else:
-                    logger.info(f"Skyscanner requests: Unexpected status {response.status_code} for {url}")
-
-            except requests.exceptions.Timeout:
-                logger.error(f"Skyscanner requests timeout for {url}")
-                continue
             except Exception as e:
-                logger.error(f"Skyscanner requests error for {url}: {e}")
+                logger.error(f"URL {i+1} failed: {e}")
                 continue
 
-        logger.warning("Skyscanner requests: No prices found in any URL")
-        return "No prices found", "Skyscanner Requests No Prices"
+        return "No prices found with enhanced methods", "All strategies failed"
 
     except Exception as e:
-        logger.error(f"Skyscanner requests error: {e}")
-        return f"Error: {str(e)}", "Skyscanner Requests Error"
+        logger.error(f"Enhanced Skyscanner requests failed: {e}")
+        return "Enhanced scraping failed", f"Error: {str(e)}"
+
+
+def extract_price_from_api_response(api_data):
+    """Extract price from Skyscanner API JSON response"""
+    try:
+        # Common API response structures
+        price_paths = [
+            # Modern API structure
+            ['Quotes', 0, 'MinPrice'],
+            ['quotes', 0, 'price'],
+            ['results', 0, 'pricing_options', 0, 'price', 'amount'],
+            ['itineraries', 0, 'pricing_options', 0, 'price', 'amount'],
+            # Legacy API structure
+            ['Quotes', 0, 'Price'],
+            ['quotes', 0, 'Price'],
+            # Direct price fields
+            ['price'],
+            ['minPrice'],
+            ['totalPrice'],
+            ['amount']
+        ]
+
+        def get_nested_value(data, path):
+            """Safely get nested dictionary value"""
+            current = data
+            for key in path:
+                if isinstance(current, dict) and key in current:
+                    current = current[key]
+                elif isinstance(current, list) and isinstance(key, int) and len(current) > key:
+                    current = current[key]
+                else:
+                    return None
+            return current
+
+        # Try each path
+        for path in price_paths:
+            price_value = get_nested_value(api_data, path)
+            if price_value is not None:
+                # Validate price
+                if isinstance(price_value, (int, float)) and 100 <= price_value <= 1500:
+                    return f"€{price_value}"
+                elif isinstance(price_value, str):
+                    # Extract numeric value from string
+                    import re
+                    price_match = re.search(r'(\d+(?:\.\d{2})?)', str(price_value))
+                    if price_match:
+                        price_num = float(price_match.group(1))
+                        if 100 <= price_num <= 1500:
+                            return f"€{price_num}"
+
+        # Search for any price-like values in the entire response
+        price_regex = re.compile(r'["\']?(?:price|amount|cost)["\']?\s*:\s*["\']?(\d+(?:\.\d{2})?)["\']?', re.IGNORECASE)
+        api_str = str(api_data)
+        matches = price_regex.findall(api_str)
+
+        for match in matches:
+            try:
+                price_num = float(match)
+                if 100 <= price_num <= 1500:
+                    return f"€{price_num}"
+            except ValueError:
+                continue
+
+        return None
+
+    except Exception as e:
+        print(f"Error extracting price from API response: {e}")
+        return None
+
+
+def extract_price_from_html_enhanced(html_content):
+    """Enhanced price extraction from HTML with multiple strategies"""
+    try:
+        soup = BeautifulSoup(html_content, 'html.parser')
+
+        # Strategy 1: Look for embedded JSON data in script tags
+        script_tags = soup.find_all('script')
+        for script in script_tags:
+            if script.string and len(script.string) > 100:
+                script_content = script.string
+
+                # Look for window.__INITIAL_STATE__ or similar
+                json_patterns = [
+                    r'window\.__INITIAL_STATE__\s*=\s*({.+?});',
+                    r'window\.__internal\s*=\s*({.+?});',
+                    r'window\[\"__internal\"\]\s*=\s*({.+?});',
+                    r'__NEXT_DATA__["\']?\s*:\s*({.+?})',
+                    r'REDUX_STATE["\']?\s*:\s*({.+?})',
+                    r'"searchResults":\s*({.+?})',
+                    r'"itineraries":\s*(\[.+?\])',
+                    r'"quotes":\s*(\[.+?\])'
+                ]
+
+                for pattern in json_patterns:
+                    matches = re.findall(pattern, script_content, re.DOTALL)
+                    for match in matches:
+                        try:
+                            json_data = json.loads(match)
+                            price = extract_price_from_api_response(json_data)
+                            if price:
+                                return price
+                        except json.JSONDecodeError:
+                            continue
+
+        # Strategy 2: Look for price patterns in HTML attributes and text
+        price_selectors = [
+            '[data-testid*="price"]',
+            '[class*="price"]',
+            '[class*="Price"]',
+            '[class*="amount"]',
+            '[class*="cost"]',
+            '.BpkText_bpk-text__*[title*="€"]',
+            '[aria-label*="€"]',
+            '[title*="€"]'
+        ]
+
+        for selector in price_selectors:
+            try:
+                elements = soup.select(selector)
+                for element in elements:
+                    # Check text content
+                    text = element.get_text(strip=True)
+                    price = extract_price_from_text(text)
+                    if price:
+                        return price
+
+                    # Check attributes
+                    for attr in ['title', 'aria-label', 'data-price', 'value']:
+                        attr_value = element.get(attr, '')
+                        if attr_value:
+                            price = extract_price_from_text(attr_value)
+                            if price:
+                                return price
+            except Exception:
+                continue
+
+        # Strategy 3: Search entire HTML for price patterns
+        price_regex = re.compile(r'€\s*(\d{2,4}(?:[.,]\d{2})?)', re.IGNORECASE)
+        matches = price_regex.findall(html_content)
+
+        for match in matches:
+            try:
+                # Handle both comma and dot as decimal separator
+                price_str = match.replace(',', '.')
+                price_num = float(price_str)
+                if 100 <= price_num <= 1500:
+                    return f"€{price_num}"
+            except ValueError:
+                continue
+
+        return None
+
+    except Exception as e:
+        print(f"Error in enhanced HTML price extraction: {e}")
+        return None
+
+
+def extract_price_from_text(text):
+    """Extract and validate price from text"""
+    if not text:
+        return None
+
+    # Multiple price patterns
+    patterns = [
+        r'€\s*(\d{2,4}(?:[.,]\d{2})?)',
+        r'(\d{2,4}(?:[.,]\d{2})?)\s*€',
+        r'EUR\s*(\d{2,4}(?:[.,]\d{2})?)',
+        r'(\d{2,4}(?:[.,]\d{2})?)\s*EUR'
+    ]
+
+    for pattern in patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        for match in matches:
+            try:
+                price_str = match.replace(',', '.')
+                price_num = float(price_str)
+                # Validate realistic price range and exclude common false positives
+                if 100 <= price_num <= 1500 and price_num not in [1000, 2000]:
+                    return f"€{price_num}"
+            except ValueError:
+                continue
+
+    return None
+
 
 def fetch_flight_price_skyscanner_only(country):
     """Fetch flight prices from Skyscanner only using requests"""
@@ -264,6 +387,7 @@ def fetch_flight_price_skyscanner_only(country):
 
     logger.error("Skyscanner scraping failed")
     return "Skyscanner scraping failed", "No data available"
+
 
 # Main agent loop
 def run_agent():
@@ -308,6 +432,7 @@ def run_agent():
 
     print(f"\n🎉 All done! Results saved to {RESULTS_FILE}")
     print("\n📋 Check debug_skyscanner_requests.html for troubleshooting")
+
 
 if __name__ == "__main__":
     run_agent()
