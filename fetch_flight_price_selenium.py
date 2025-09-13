@@ -46,7 +46,7 @@ def get_current_ip():
     except:
         return "Unknown"
 
-def create_selenium_driver():
+def create_selenium_driver(headless=True):
     """Create an undetected Selenium Chrome driver with stealth options"""
     try:
         # Use undetected-chromedriver with advanced stealth
@@ -72,12 +72,25 @@ def create_selenium_driver():
         options.add_argument("--memory-pressure-off")
 
         # Window size (important for detection)
-        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--window-size=1366,768")  # More common resolution
 
-        # Run in headless mode
-        options.add_argument("--headless=new")  # Use new headless mode
+        # Conditional headless mode
+        if headless:
+            # Try without headless first for testing
+            print("⚠️  Running in NON-HEADLESS mode to avoid detection")
+            # options.add_argument("--headless=new")  # Commented out for testing
 
-        # Create undetected Chrome driver
+        # Additional stealth arguments
+        options.add_argument("--disable-gpu")
+        options.add_argument("--no-first-run")
+        options.add_argument("--disable-default-apps")
+        options.add_argument("--disable-popup-blocking")
+        options.add_argument("--disable-translate")
+        options.add_argument("--disable-background-networking")
+        options.add_argument("--disable-sync")
+        options.add_argument("--disable-component-extensions-with-background-pages")
+
+        # Create undetected Chrome driver with more options
         driver = uc.Chrome(
             options=options,
             version_main=None,  # Auto-detect Chrome version
@@ -85,8 +98,9 @@ def create_selenium_driver():
             browser_executable_path=None,  # Use system Chrome
             user_data_dir=None,  # Use temp profile
             suppress_welcome=True,
-            use_subprocess=True,
-            debug=False
+            use_subprocess=False,  # Changed to False for better stealth
+            debug=False,
+            keep_alive=True
         )
 
         # Additional stealth measures
@@ -94,9 +108,13 @@ def create_selenium_driver():
         driver.execute_script("Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]})")
         driver.execute_script("Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']})")
         driver.execute_script("window.chrome = { runtime: {} }")
+        driver.execute_script("Object.defineProperty(navigator, 'permissions', {get: () => ({query: () => Promise.resolve({state: 'granted'})})})")
 
         # Set realistic viewport
-        driver.set_window_size(1920, 1080)
+        driver.set_window_size(1366, 768)
+
+        # Additional delay after driver creation
+        time.sleep(random.uniform(2, 5))
 
         return driver
 
@@ -114,7 +132,7 @@ def scrape_skyscanner_selenium():
     """Scrape Skyscanner using Selenium for JavaScript rendering"""
     driver = None
     try:
-        driver = create_selenium_driver()
+        driver = create_selenium_driver(headless=False)
         if not driver:
             return "Driver creation failed", "Selenium Error"
 
