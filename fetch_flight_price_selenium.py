@@ -109,9 +109,7 @@ def scrape_pegasus_airlines():
 
         # Step 2: Access the direct booking URL with multiple attempts
         pegasus_urls = [
-            "https://web.flypgs.com/booking?AFFILIATEID=XSS00&returnDate=2025-10-24&arrivalPort=AYT&adultCount=1&dateOption=1&language=EN&childCount=0&departurePort=CPH&currency=EUR&departureDate=2025-10-17&infantCount=0&skyscanner_redirectid=E8cT5f9OTQCKksEVF5ULsQ",
-            "https://www.flypgs.com/booking?AFFILIATEID=XSS00&returnDate=2025-10-24&arrivalPort=AYT&adultCount=1&dateOption=1&language=EN&childCount=0&departurePort=CPH&currency=EUR&departureDate=2025-10-17&infantCount=0",
-            "https://web.flypgs.com/en/booking?returnDate=2025-10-24&arrivalPort=AYT&adultCount=1&dateOption=1&language=EN&childCount=0&departurePort=CPH&currency=EUR&departureDate=2025-10-17&infantCount=0"
+            "https://web.flypgs.com/booking?language=en&adultCount=1&arrivalPort=AYT&departurePort=CPH&currency=EUR&dateOption=1&departureDate=2025-10-17&returnDate=2025-10-24&ili=Copenhagen-Antalya&iln=home%20page-Booking",
         ]
 
         for i, pegasus_url in enumerate(pegasus_urls):
