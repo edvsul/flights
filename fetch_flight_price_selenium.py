@@ -47,9 +47,9 @@ def get_current_ip():
         return "Unknown"
 
 def create_selenium_driver(headless=True):
-    """Create Selenium WebDriver with advanced anti-detection"""
+    """Create Selenium WebDriver with enhanced anti-detection for PerimeterX bypass"""
     try:
-        print("🤖 Creating undetected Chrome driver with advanced stealth...")
+        print("🤖 Creating undetected Chrome driver with enhanced PerimeterX bypass...")
 
         # Advanced Chrome options for maximum stealth
         options = uc.ChromeOptions()
@@ -58,57 +58,135 @@ def create_selenium_driver(headless=True):
         if headless:
             options.add_argument("--headless=new")
 
-        # Anti-detection arguments
+        # Enhanced anti-detection arguments
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-plugins")
         options.add_argument("--disable-images")
-        options.add_argument("--disable-javascript")  # Temporarily disable to avoid detection
-        options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--disable-software-rasterizer")
 
-        # Memory and performance
+        # Remove automation indicators
+        options.add_argument("--disable-blink-features")
+        options.add_argument("--disable-features=VizDisplayCompositor")
+        options.add_argument("--disable-ipc-flooding-protection")
+
+        # Realistic browser fingerprint
+        options.add_argument("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+        # Memory and performance optimizations
         options.add_argument("--memory-pressure-off")
         options.add_argument("--max_old_space_size=4096")
-        options.add_argument("--single-process")
 
-        # Network and security
+        # Network and security for bypass
         options.add_argument("--disable-web-security")
-        options.add_argument("--disable-features=VizDisplayCompositor")
         options.add_argument("--ignore-certificate-errors")
         options.add_argument("--allow-running-insecure-content")
+        options.add_argument("--disable-background-timer-throttling")
+        options.add_argument("--disable-backgrounding-occluded-windows")
+        options.add_argument("--disable-renderer-backgrounding")
 
-        # Create driver with version_main for compatibility
-        driver = uc.Chrome(options=options, version_main=120)
+        # Additional PerimeterX bypass options
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option('useAutomationExtension', False)
+        options.add_experimental_option("detach", True)
 
-        # Advanced stealth techniques
+        # Prefs to disable automation detection
+        prefs = {
+            "profile.default_content_setting_values.notifications": 2,
+            "profile.default_content_settings.popups": 0,
+            "profile.managed_default_content_settings.images": 2,
+            "profile.default_content_setting_values.plugins": 1,
+            "profile.content_settings.plugin_whitelist.adobe-flash-player": 1,
+            "profile.content_settings.exceptions.plugins.*,*.per_resource.adobe-flash-player": 1,
+            "PluginsAllowedForUrls": ["https://www.skyscanner.com", "https://www.skyscanner.net", "https://www.skyscanner.de"]
+        }
+        options.add_experimental_option("prefs", prefs)
+
+        # Create driver with specific version for stability
+        driver = uc.Chrome(options=options, version_main=120, driver_executable_path=None)
+
+        # Enhanced stealth techniques for PerimeterX bypass
         driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
             'source': '''
+                // Remove webdriver property
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined,
                 });
+
+                // Mock plugins
                 Object.defineProperty(navigator, 'plugins', {
                     get: () => [1, 2, 3, 4, 5],
                 });
+
+                // Mock languages
                 Object.defineProperty(navigator, 'languages', {
                     get: () => ['en-US', 'en'],
                 });
+
+                // Mock chrome object
                 window.chrome = {
                     runtime: {},
+                    loadTimes: function() {},
+                    csi: function() {},
+                    app: {}
                 };
+
+                // Mock permissions
                 Object.defineProperty(navigator, 'permissions', {
                     get: () => ({
                         query: () => Promise.resolve({ state: 'granted' }),
                     }),
                 });
+
+                // Override automation detection
+                Object.defineProperty(navigator, 'maxTouchPoints', {
+                    get: () => 1,
+                });
+
+                // Mock connection
+                Object.defineProperty(navigator, 'connection', {
+                    get: () => ({
+                        effectiveType: '4g',
+                        rtt: 50,
+                        downlink: 10
+                    }),
+                });
+
+                // Remove automation flags
+                delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
+                delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
+                delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
+
+                // Mock screen properties
+                Object.defineProperty(screen, 'availWidth', {
+                    get: () => 1920,
+                });
+                Object.defineProperty(screen, 'availHeight', {
+                    get: () => 1080,
+                });
+
+                // Mock timezone
+                Date.prototype.getTimezoneOffset = function() {
+                    return -60; // CET timezone
+                };
             '''
+        })
+
+        # Additional CDP commands for stealth
+        driver.execute_cdp_cmd('Network.setUserAgentOverride', {
+            "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "acceptLanguage": "en-US,en;q=0.9",
+            "platform": "MacIntel"
         })
 
         # Set realistic viewport
         driver.set_window_size(1920, 1080)
+        driver.set_window_position(0, 0)
 
-        logger.info("✅ Undetected Chrome driver created successfully")
+        logger.info("✅ Enhanced undetected Chrome driver created successfully")
         return driver
 
     except Exception as e:
@@ -214,7 +292,7 @@ def scrape_skyscanner_requests():
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Language': 'en-US,en;q=0.9,de;q=0.8',
             'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive',
             'Upgrade-Insecure-Requests': '1',
@@ -224,7 +302,8 @@ def scrape_skyscanner_requests():
         urls = [
             "https://www.skyscanner.com/transport/flights/cph/ayt/251017/251024/?adults=1&cabinclass=economy&rtn=1",
             "https://www.skyscanner.net/transport/flights/cph/ayt/251017/251024/?adults=1&currency=EUR",
-            "https://www.skyscanner.com/transport/flights/cph/ayt/?adults=1&cabinclass=economy"
+            "https://www.skyscanner.com/transport/flights/cph/ayt/?adults=1&cabinclass=economy",
+            "https://www.skyscanner.de/transport/fluge/cph/ayt/?adults=1&cabinclass=economy"
         ]
 
         for url in urls:
@@ -235,12 +314,40 @@ def scrape_skyscanner_requests():
                 if response.status_code == 200:
                     save_debug_html(response.text, "skyscanner_requests")
 
-                    # Look for price patterns
+                    # Parse HTML with BeautifulSoup
+                    soup = BeautifulSoup(response.text, 'html.parser')
+
+                    # Look for JSON data in script tags (common in modern SPAs)
+                    script_tags = soup.find_all('script')
+                    for script in script_tags:
+                        if script.string and ('price' in script.string.lower() or 'eur' in script.string.lower()):
+                            # Extract prices from JSON data
+                            json_prices = re.findall(r'"price"[^}]*?(\d{2,4})', script.string)
+                            eur_prices = re.findall(r'"EUR"[^}]*?(\d{2,4})', script.string)
+                            currency_prices = re.findall(r'"currency":"EUR"[^}]*?"amount":(\d{2,4})', script.string)
+
+                            all_found_prices = json_prices + eur_prices + currency_prices
+                            if all_found_prices:
+                                for price_str in all_found_prices:
+                                    price_num = int(price_str)
+                                    if 50 <= price_num <= 2000:
+                                        price = f"€{price_num}"
+                                        logger.info(f"Skyscanner requests found price in JSON: {price}")
+                                        return f"{price} (Skyscanner-Requests-JSON)", "Skyscanner Requests JSON"
+
+                    # Look for price patterns in the HTML text
                     price_patterns = [
-                        r'€\s*\d{2,4}',
-                        r'EUR\s*\d{2,4}',
-                        r'\d{2,4}\s*€',
-                        r'\d{2,4}\s*EUR',
+                        r'€\s*(\d{2,4})',
+                        r'EUR\s*(\d{2,4})',
+                        r'(\d{2,4})\s*€',
+                        r'(\d{2,4})\s*EUR',
+                        r'"price":\s*"?€?(\d{2,4})',
+                        r'"amount":\s*"?(\d{2,4})"?',
+                        r'price.*?(\d{2,4})',
+                        # German specific patterns
+                        r'ab\s*€\s*(\d{2,4})',
+                        r'€(\d{2,4})',
+                        r'(\d{2,4})€',
                     ]
 
                     for pattern in price_patterns:
@@ -248,20 +355,25 @@ def scrape_skyscanner_requests():
                         if matches:
                             valid_prices = []
                             for match in matches:
-                                price_num = int(re.search(r'\d+', str(match)).group())
-                                if 50 <= price_num <= 2000:
-                                    valid_prices.append(f"€{price_num}")
+                                try:
+                                    price_num = int(match)
+                                    if 50 <= price_num <= 2000:
+                                        valid_prices.append(f"€{price_num}")
+                                except ValueError:
+                                    continue
 
                             if valid_prices:
                                 price = valid_prices[0]
                                 logger.info(f"Skyscanner requests found price: {price}")
                                 return f"{price} (Skyscanner-Requests)", "Skyscanner Requests"
 
+                logger.info(f"Skyscanner requests: No prices found in {url} (status: {response.status_code})")
+
             except Exception as e:
                 logger.error(f"Skyscanner requests error for {url}: {e}")
                 continue
 
-        logger.warning("Skyscanner requests: No prices found")
+        logger.warning("Skyscanner requests: No prices found in any URL")
         return "No prices found", "Skyscanner Requests No Prices"
 
     except Exception as e:
