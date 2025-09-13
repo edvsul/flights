@@ -72,56 +72,107 @@ def scrape_pegasus_airlines():
         }
         session.headers.update(headers)
 
-        # Step 1: Visit Pegasus homepage to establish session
-        print("🏠 Establishing session with Pegasus Airlines...")
-        homepage_response = session.get("https://web.flypgs.com/", timeout=15)
-        if homepage_response.status_code != 200:
-            return "Pegasus homepage access failed", "Session establishment error"
+        # Step 1: Try multiple Pegasus homepage URLs
+        homepage_urls = [
+            "https://web.flypgs.com/",
+            "https://www.flypgs.com/",
+            "https://flypgs.com/",
+            "https://web.flypgs.com/en"
+        ]
 
-        # Step 2: Access the direct booking URL
-        pegasus_url = "https://web.flypgs.com/booking?AFFILIATEID=XSS00&returnDate=2025-10-24&arrivalPort=AYT&adultCount=1&dateOption=1&language=EN&childCount=0&departurePort=CPH&currency=EUR&departureDate=2025-10-17&infantCount=0&skyscanner_redirectid=E8cT5f9OTQCKksEVF5ULsQ"
+        homepage_success = False
+        for i, homepage_url in enumerate(homepage_urls):
+            try:
+                print(f"🏠 Trying Pegasus homepage {i+1}/{len(homepage_urls)}: {homepage_url}")
+                homepage_response = session.get(homepage_url, timeout=20, allow_redirects=True)
 
-        print("🔍 Accessing Pegasus booking page...")
-        time.sleep(random.uniform(2, 4))  # Human-like delay
+                if homepage_response.status_code == 200:
+                    print(f"✅ Successfully connected to Pegasus homepage")
+                    homepage_success = True
+                    break
+                else:
+                    print(f"❌ Homepage {i+1} returned status: {homepage_response.status_code}")
 
-        response = session.get(pegasus_url, timeout=30)
-        print(f"Pegasus response status: {response.status_code}")
+            except requests.exceptions.Timeout:
+                print(f"⏰ Homepage {i+1} timed out")
+                continue
+            except requests.exceptions.ConnectionError:
+                print(f"🔌 Homepage {i+1} connection failed")
+                continue
+            except Exception as e:
+                print(f"❌ Homepage {i+1} error: {e}")
+                continue
 
-        if response.status_code == 200:
-            # Save debug HTML
-            save_debug_html(response.text, "pegasus_booking")
+        # If homepage fails, try direct booking URL anyway
+        if not homepage_success:
+            print("⚠️  Homepage access failed, trying direct booking URL...")
 
-            # Check for common blocking indicators
-            content_lower = response.text.lower()
-            blocking_indicators = ['captcha', 'access denied', 'blocked', 'security check', 'human verification']
+        # Step 2: Access the direct booking URL with multiple attempts
+        pegasus_urls = [
+            "https://web.flypgs.com/booking?AFFILIATEID=XSS00&returnDate=2025-10-24&arrivalPort=AYT&adultCount=1&dateOption=1&language=EN&childCount=0&departurePort=CPH&currency=EUR&departureDate=2025-10-17&infantCount=0&skyscanner_redirectid=E8cT5f9OTQCKksEVF5ULsQ",
+            "https://www.flypgs.com/booking?AFFILIATEID=XSS00&returnDate=2025-10-24&arrivalPort=AYT&adultCount=1&dateOption=1&language=EN&childCount=0&departurePort=CPH&currency=EUR&departureDate=2025-10-17&infantCount=0",
+            "https://web.flypgs.com/en/booking?returnDate=2025-10-24&arrivalPort=AYT&adultCount=1&dateOption=1&language=EN&childCount=0&departurePort=CPH&currency=EUR&departureDate=2025-10-17&infantCount=0"
+        ]
 
-            if any(indicator in content_lower for indicator in blocking_indicators):
-                print("❌ Pegasus page blocked or requires verification!")
-                return "Pegasus page blocked", "Access denied"
+        for i, pegasus_url in enumerate(pegasus_urls):
+            try:
+                print(f"🔍 Trying Pegasus booking URL {i+1}/{len(pegasus_urls)}...")
+                time.sleep(random.uniform(2, 5))  # Human-like delay
 
-            # Extract prices using multiple strategies
-            price = extract_pegasus_prices(response.text)
-            if price:
-                return price, "Pegasus Airlines Direct"
+                response = session.get(pegasus_url, timeout=30, allow_redirects=True)
+                print(f"Pegasus response status: {response.status_code}")
 
-            # Try API endpoint discovery for Pegasus
-            api_price = try_pegasus_api_endpoints(session, response.text)
-            if api_price:
-                return api_price, "Pegasus API"
+                if response.status_code == 200:
+                    # Save debug HTML
+                    save_debug_html(response.text, f"pegasus_booking_url_{i+1}")
 
-        elif response.status_code == 302 or response.status_code == 301:
-            print("🔄 Pegasus redirected, following redirect...")
-            # Follow redirect manually to maintain session
-            redirect_url = response.headers.get('Location')
-            if redirect_url:
-                redirect_response = session.get(redirect_url, timeout=30)
-                if redirect_response.status_code == 200:
-                    save_debug_html(redirect_response.text, "pegasus_redirect")
-                    price = extract_pegasus_prices(redirect_response.text)
+                    # Check for common blocking indicators
+                    content_lower = response.text.lower()
+                    blocking_indicators = ['captcha', 'access denied', 'blocked', 'security check', 'human verification', 'cloudflare']
+
+                    if any(indicator in content_lower for indicator in blocking_indicators):
+                        print(f"❌ Pegasus URL {i+1} blocked or requires verification!")
+                        continue  # Try next URL
+
+                    # Check if page has meaningful content
+                    if len(response.text) < 1000:
+                        print(f"❌ Pegasus URL {i+1} returned minimal content")
+                        continue
+
+                    # Extract prices using multiple strategies
+                    price = extract_pegasus_prices(response.text)
                     if price:
-                        return price, "Pegasus Airlines Redirect"
+                        return price, f"Pegasus Airlines Direct URL {i+1}"
 
-        return "No Pegasus prices found", "Pegasus scraping failed"
+                    # Try API endpoint discovery for Pegasus
+                    api_price = try_pegasus_api_endpoints(session, response.text)
+                    if api_price:
+                        return api_price, f"Pegasus API URL {i+1}"
+
+                    # If no price found but page loaded, return partial success
+                    print(f"✅ Pegasus URL {i+1} loaded but no prices found")
+                    return "No prices found on loaded page", f"Pegasus Airlines Loaded URL {i+1}"
+
+                elif response.status_code == 302 or response.status_code == 301:
+                    print(f"🔄 Pegasus URL {i+1} redirected...")
+                    # Redirects are handled by allow_redirects=True
+                    continue
+
+                else:
+                    print(f"❌ Pegasus URL {i+1} returned status: {response.status_code}")
+                    continue
+
+            except requests.exceptions.Timeout:
+                print(f"⏰ Pegasus URL {i+1} timed out")
+                continue
+            except requests.exceptions.ConnectionError:
+                print(f"🔌 Pegasus URL {i+1} connection failed")
+                continue
+            except Exception as e:
+                print(f"❌ Pegasus URL {i+1} error: {e}")
+                continue
+
+        return "All Pegasus URLs failed", "Connection issues"
 
     except Exception as e:
         logger.error(f"Pegasus Airlines scraping failed: {e}")
