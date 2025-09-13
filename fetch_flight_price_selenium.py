@@ -46,16 +46,17 @@ def save_debug_html(content, filename):
             f.write(content)
         logger.info(f"Debug HTML saved to debug_{filename}.html")
 
-def scrape_skyscanner_requests():
+def scrape_pegasus_airlines():
+    """Scrape Pegasus Airlines direct booking page for CPH-AYT flights"""
     try:
-        print("🔄 Trying enhanced Skyscanner requests with API discovery...")
+        print("🔄 Trying Pegasus Airlines direct booking...")
         session = requests.Session()
 
-        # Enhanced headers with more realistic browser fingerprinting
+        # Enhanced headers for Pegasus website
         headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-            'Accept-Language': 'en-US,en;q=0.9,de;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9,tr;q=0.8',
             'Accept-Encoding': 'gzip, deflate, br, zstd',
             'DNT': '1',
             'Connection': 'keep-alive',
@@ -71,116 +72,276 @@ def scrape_skyscanner_requests():
         }
         session.headers.update(headers)
 
-        # Step 1: Establish session via homepage
-        print("🏠 Establishing session via homepage...")
-        homepage_response = session.get("https://www.skyscanner.net", timeout=15)
+        # Step 1: Visit Pegasus homepage to establish session
+        print("🏠 Establishing session with Pegasus Airlines...")
+        homepage_response = session.get("https://web.flypgs.com/", timeout=15)
         if homepage_response.status_code != 200:
-            return "Homepage access failed", "Session establishment error"
+            return "Pegasus homepage access failed", "Session establishment error"
 
-        # Check for CAPTCHA on homepage
-        if any(indicator in homepage_response.text.lower() for indicator in ['captcha', 'perimeterx', 'px-captcha']):
-            print("❌ CAPTCHA detected on homepage!")
-            return "CAPTCHA detected", "Homepage blocked"
+        # Step 2: Access the direct booking URL
+        pegasus_url = "https://web.flypgs.com/booking?AFFILIATEID=XSS00&returnDate=2025-10-24&arrivalPort=AYT&adultCount=1&dateOption=1&language=EN&childCount=0&departurePort=CPH&currency=EUR&departureDate=2025-10-17&infantCount=0&skyscanner_redirectid=E8cT5f9OTQCKksEVF5ULsQ"
 
-        # Step 2: Try API endpoints first (most reliable)
-        api_endpoints = [
-            # Modern Skyscanner API endpoints
-            "https://www.skyscanner.net/g/conductor/v1/fps3/search/?adults=1&cabinClass=economy&currency=EUR&locale=en-US&locationSchema=sky&market=US&destinationEntityId=95673612&originEntityId=95673519&outboundDate=2025-10-17&inboundDate=2025-10-24",
-            "https://www.skyscanner.net/api/v1/flights/browse/browsequotes/v1.0/US/EUR/en-US/CPH-sky/AYT-sky/2025-10-17/2025-10-24?adults=1&children=0&infants=0&cabinclass=Economy",
-            "https://www.skyscanner.de/g/chiron/api/v1/prices/search?adults=1&cabinClass=economy&currency=EUR&locale=de-DE&market=DE&destinationEntityId=95673612&originEntityId=95673519&outboundDate=2025-10-17&inboundDate=2025-10-24",
+        print("🔍 Accessing Pegasus booking page...")
+        time.sleep(random.uniform(2, 4))  # Human-like delay
+
+        response = session.get(pegasus_url, timeout=30)
+        print(f"Pegasus response status: {response.status_code}")
+
+        if response.status_code == 200:
+            # Save debug HTML
+            save_debug_html(response.text, "pegasus_booking")
+
+            # Check for common blocking indicators
+            content_lower = response.text.lower()
+            blocking_indicators = ['captcha', 'access denied', 'blocked', 'security check', 'human verification']
+
+            if any(indicator in content_lower for indicator in blocking_indicators):
+                print("❌ Pegasus page blocked or requires verification!")
+                return "Pegasus page blocked", "Access denied"
+
+            # Extract prices using multiple strategies
+            price = extract_pegasus_prices(response.text)
+            if price:
+                return price, "Pegasus Airlines Direct"
+
+            # Try API endpoint discovery for Pegasus
+            api_price = try_pegasus_api_endpoints(session, response.text)
+            if api_price:
+                return api_price, "Pegasus API"
+
+        elif response.status_code == 302 or response.status_code == 301:
+            print("🔄 Pegasus redirected, following redirect...")
+            # Follow redirect manually to maintain session
+            redirect_url = response.headers.get('Location')
+            if redirect_url:
+                redirect_response = session.get(redirect_url, timeout=30)
+                if redirect_response.status_code == 200:
+                    save_debug_html(redirect_response.text, "pegasus_redirect")
+                    price = extract_pegasus_prices(redirect_response.text)
+                    if price:
+                        return price, "Pegasus Airlines Redirect"
+
+        return "No Pegasus prices found", "Pegasus scraping failed"
+
+    except Exception as e:
+        logger.error(f"Pegasus Airlines scraping failed: {e}")
+        return "Pegasus scraping error", f"Error: {str(e)}"
+
+
+def extract_pegasus_prices(html_content):
+    """Extract prices from Pegasus Airlines booking page"""
+    try:
+        soup = BeautifulSoup(html_content, 'html.parser')
+
+        # Strategy 1: Look for Pegasus-specific price elements
+        pegasus_price_selectors = [
+            # Common airline booking price selectors
+            '[data-testid*="price"]',
+            '[class*="price"]',
+            '[class*="Price"]',
+            '[class*="fare"]',
+            '[class*="Fare"]',
+            '[class*="amount"]',
+            '[class*="Amount"]',
+            '[class*="total"]',
+            '[class*="Total"]',
+            # Pegasus-specific selectors (common patterns)
+            '.flight-price',
+            '.fare-price',
+            '.booking-price',
+            '.total-price',
+            '[data-price]',
+            '[data-fare]',
+            '.currency',
+            # Turkish airline specific
+            '.ucret',
+            '.fiyat',
+            '.tutar'
         ]
 
-        for i, api_url in enumerate(api_endpoints):
+        for selector in pegasus_price_selectors:
             try:
-                print(f"🔍 Trying API endpoint {i+1}/{len(api_endpoints)}")
+                elements = soup.select(selector)
+                for element in elements:
+                    # Check text content
+                    text = element.get_text(strip=True)
+                    price = extract_price_from_text(text)
+                    if price:
+                        print(f"✅ Found Pegasus price in element: {price}")
+                        return price
 
-                # Update headers for API calls
+                    # Check attributes
+                    for attr in ['data-price', 'data-fare', 'data-amount', 'title', 'aria-label', 'value']:
+                        attr_value = element.get(attr, '')
+                        if attr_value:
+                            price = extract_price_from_text(attr_value)
+                            if price:
+                                print(f"✅ Found Pegasus price in attribute {attr}: {price}")
+                                return price
+            except Exception:
+                continue
+
+        # Strategy 2: Look for JSON data in script tags
+        script_tags = soup.find_all('script')
+        for script in script_tags:
+            if script.string and len(script.string) > 50:
+                script_content = script.string
+
+                # Look for flight/booking data structures
+                json_patterns = [
+                    r'flightData["\']?\s*[:=]\s*({.+?})',
+                    r'bookingData["\']?\s*[:=]\s*({.+?})',
+                    r'fareData["\']?\s*[:=]\s*({.+?})',
+                    r'priceData["\']?\s*[:=]\s*({.+?})',
+                    r'"flights":\s*(\[.+?\])',
+                    r'"fares":\s*(\[.+?\])',
+                    r'"prices":\s*(\[.+?\])',
+                    r'window\.initialData\s*=\s*({.+?});',
+                    r'window\.flightResults\s*=\s*({.+?});'
+                ]
+
+                for pattern in json_patterns:
+                    matches = re.findall(pattern, script_content, re.DOTALL)
+                    for match in matches:
+                        try:
+                            json_data = json.loads(match)
+                            price = extract_price_from_api_response(json_data)
+                            if price:
+                                print(f"✅ Found Pegasus price in JSON: {price}")
+                                return price
+                        except json.JSONDecodeError:
+                            continue
+
+        # Strategy 3: Search for EUR price patterns in entire HTML
+        eur_patterns = [
+            r'€\s*(\d{2,4}(?:[.,]\d{2})?)',
+            r'EUR\s*(\d{2,4}(?:[.,]\d{2})?)',
+            r'(\d{2,4}(?:[.,]\d{2})?)\s*€',
+            r'(\d{2,4}(?:[.,]\d{2})?)\s*EUR',
+            # Turkish Lira patterns (in case EUR not available)
+            r'₺\s*(\d{3,5}(?:[.,]\d{2})?)',
+            r'TL\s*(\d{3,5}(?:[.,]\d{2})?)',
+            r'(\d{3,5}(?:[.,]\d{2})?)\s*₺',
+            r'(\d{3,5}(?:[.,]\d{2})?)\s*TL'
+        ]
+
+        for pattern in eur_patterns:
+            matches = re.findall(pattern, html_content, re.IGNORECASE)
+            for match in matches:
+                try:
+                    price_str = match.replace(',', '.')
+                    price_num = float(price_str)
+
+                    # Different validation for EUR vs TL
+                    if '€' in pattern or 'EUR' in pattern:
+                        if 100 <= price_num <= 1500:
+                            print(f"✅ Found EUR price pattern: €{price_num}")
+                            return f"€{price_num}"
+                    else:  # Turkish Lira
+                        if 3000 <= price_num <= 45000:  # Approximate TL range
+                            # Convert TL to EUR (approximate rate 1 EUR = 30 TL)
+                            eur_price = price_num / 30
+                            if 100 <= eur_price <= 1500:
+                                print(f"✅ Found TL price pattern: ₺{price_num} (~€{eur_price:.0f})")
+                                return f"€{eur_price:.0f}"
+                except ValueError:
+                    continue
+
+        return None
+
+    except Exception as e:
+        print(f"Error extracting Pegasus prices: {e}")
+        return None
+
+
+def try_pegasus_api_endpoints(session, html_content):
+    """Try to find and call Pegasus API endpoints"""
+    try:
+        # Look for API endpoints in the HTML/JavaScript
+        api_patterns = [
+            r'["\']([^"\']*api[^"\']*flight[^"\']*)["\']',
+            r'["\']([^"\']*flight[^"\']*api[^"\']*)["\']',
+            r'["\']([^"\']*booking[^"\']*api[^"\']*)["\']',
+            r'["\']([^"\']*search[^"\']*flight[^"\']*)["\']',
+            r'url["\']?\s*:\s*["\']([^"\']*api[^"\']*)["\']',
+            r'endpoint["\']?\s*:\s*["\']([^"\']*)["\']'
+        ]
+
+        potential_endpoints = []
+        for pattern in api_patterns:
+            matches = re.findall(pattern, html_content, re.IGNORECASE)
+            potential_endpoints.extend(matches)
+
+        # Common Pegasus API endpoint patterns
+        base_endpoints = [
+            "/api/flight/search",
+            "/api/booking/search",
+            "/api/flights/availability",
+            "/booking/api/search",
+            "/flight/api/search"
+        ]
+
+        # Try potential endpoints
+        for endpoint in set(potential_endpoints + base_endpoints):
+            if not endpoint.startswith('http'):
+                endpoint = f"https://web.flypgs.com{endpoint}"
+
+            try:
+                print(f"🔍 Trying Pegasus API: {endpoint}")
+
+                # Prepare API request
                 api_headers = session.headers.copy()
                 api_headers.update({
                     'Accept': 'application/json, text/plain, */*',
-                    'Referer': 'https://www.skyscanner.net/',
-                    'X-Requested-With': 'XMLHttpRequest'
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Referer': 'https://web.flypgs.com/booking'
                 })
 
-                api_response = session.get(api_url, headers=api_headers, timeout=30)
-                print(f"API response status: {api_response.status_code}")
-
-                if api_response.status_code == 200:
+                # Try both GET and POST
+                for method in ['GET', 'POST']:
                     try:
-                        api_data = api_response.json()
-                        print(f"✅ Got JSON response from API endpoint {i+1}")
+                        if method == 'GET':
+                            api_response = session.get(endpoint, headers=api_headers, timeout=15)
+                        else:
+                            # Basic flight search payload
+                            payload = {
+                                "departurePort": "CPH",
+                                "arrivalPort": "AYT",
+                                "departureDate": "2025-10-17",
+                                "returnDate": "2025-10-24",
+                                "adultCount": 1,
+                                "childCount": 0,
+                                "infantCount": 0,
+                                "currency": "EUR"
+                            }
+                            api_response = session.post(endpoint, json=payload, headers=api_headers, timeout=15)
 
-                        # Extract prices from API response
-                        price = extract_price_from_api_response(api_data)
-                        if price:
-                            return price, f"API endpoint {i+1}"
+                        if api_response.status_code == 200:
+                            try:
+                                api_data = api_response.json()
+                                price = extract_price_from_api_response(api_data)
+                                if price:
+                                    print(f"✅ Found price via Pegasus API: {price}")
+                                    return price
+                            except json.JSONDecodeError:
+                                continue
 
-                    except json.JSONDecodeError:
-                        print(f"❌ API endpoint {i+1} returned non-JSON data")
+                    except Exception:
                         continue
 
-            except Exception as e:
-                print(f"❌ API endpoint {i+1} failed: {e}")
+            except Exception:
                 continue
 
-        # Step 3: Enhanced web scraping with multiple strategies
-        time.sleep(random.uniform(2, 5))
-
-        # Try multiple Skyscanner URLs with different strategies
-        urls = [
-            "https://www.skyscanner.net/transport/flights/cph/ayt/251017/251024/?adults=1&currency=EUR",
-            "https://www.skyscanner.com/transport/flights/cph/ayt/251017/251024/?adults=1&cabinclass=economy&rtn=1",
-            "https://www.skyscanner.de/transport/fluge/cph/ayt/251017/251024/?adults=1&cabinclass=economy&rtn=1",
-            "https://www.skyscanner.net/transport/flights/cph/ayt/?adults=1&currency=EUR"
-        ]
-
-        for i, url in enumerate(urls):
-            try:
-                logger.info(f"Trying Skyscanner requests with URL {i+1}/{len(urls)}: {url}")
-
-                # Add referer for more realistic requests
-                if i > 0:
-                    session.headers.update({'Referer': urls[i-1]})
-
-                # Random delay between requests
-                if i > 0:
-                    delay = random.uniform(3, 8)
-                    print(f"⏱️  Human-like delay: {delay:.1f}s")
-                    time.sleep(delay)
-
-                response = session.get(url, timeout=30)
-                print(f"Response status: {response.status_code}")
-
-                if response.status_code == 200:
-                    # Check for CAPTCHA first
-                    content_lower = response.text.lower()
-                    captcha_indicators = ['captcha', 'are you a person or a robot', 'perimeterx', 'px-captcha', 'human verification', 'access denied']
-
-                    if any(indicator in content_lower for indicator in captcha_indicators):
-                        print(f"❌ CAPTCHA detected on URL {i+1}!")
-                        save_debug_html(response.text, f"captcha_url_{i+1}_requests")
-                        continue  # Try next URL
-
-                    save_debug_html(response.text, f"skyscanner_requests_url_{i+1}")
-
-                    # Enhanced price extraction strategies
-                    price = extract_price_from_html_enhanced(response.text)
-                    if price:
-                        return price, f"Enhanced HTML extraction URL {i+1}"
-
-            except Exception as e:
-                logger.error(f"URL {i+1} failed: {e}")
-                continue
-
-        return "No prices found with enhanced methods", "All strategies failed"
+        return None
 
     except Exception as e:
-        logger.error(f"Enhanced Skyscanner requests failed: {e}")
-        return "Enhanced scraping failed", f"Error: {str(e)}"
+        print(f"Error trying Pegasus API endpoints: {e}")
+        return None
 
 
 def extract_price_from_api_response(api_data):
-    """Extract price from Skyscanner API JSON response"""
+    """Extract price from API JSON response"""
     try:
         # Common API response structures
         price_paths = [
@@ -247,93 +408,6 @@ def extract_price_from_api_response(api_data):
         return None
 
 
-def extract_price_from_html_enhanced(html_content):
-    """Enhanced price extraction from HTML with multiple strategies"""
-    try:
-        soup = BeautifulSoup(html_content, 'html.parser')
-
-        # Strategy 1: Look for embedded JSON data in script tags
-        script_tags = soup.find_all('script')
-        for script in script_tags:
-            if script.string and len(script.string) > 100:
-                script_content = script.string
-
-                # Look for window.__INITIAL_STATE__ or similar
-                json_patterns = [
-                    r'window\.__INITIAL_STATE__\s*=\s*({.+?});',
-                    r'window\.__internal\s*=\s*({.+?});',
-                    r'window\[\"__internal\"\]\s*=\s*({.+?});',
-                    r'__NEXT_DATA__["\']?\s*:\s*({.+?})',
-                    r'REDUX_STATE["\']?\s*:\s*({.+?})',
-                    r'"searchResults":\s*({.+?})',
-                    r'"itineraries":\s*(\[.+?\])',
-                    r'"quotes":\s*(\[.+?\])'
-                ]
-
-                for pattern in json_patterns:
-                    matches = re.findall(pattern, script_content, re.DOTALL)
-                    for match in matches:
-                        try:
-                            json_data = json.loads(match)
-                            price = extract_price_from_api_response(json_data)
-                            if price:
-                                return price
-                        except json.JSONDecodeError:
-                            continue
-
-        # Strategy 2: Look for price patterns in HTML attributes and text
-        price_selectors = [
-            '[data-testid*="price"]',
-            '[class*="price"]',
-            '[class*="Price"]',
-            '[class*="amount"]',
-            '[class*="cost"]',
-            '.BpkText_bpk-text__*[title*="€"]',
-            '[aria-label*="€"]',
-            '[title*="€"]'
-        ]
-
-        for selector in price_selectors:
-            try:
-                elements = soup.select(selector)
-                for element in elements:
-                    # Check text content
-                    text = element.get_text(strip=True)
-                    price = extract_price_from_text(text)
-                    if price:
-                        return price
-
-                    # Check attributes
-                    for attr in ['title', 'aria-label', 'data-price', 'value']:
-                        attr_value = element.get(attr, '')
-                        if attr_value:
-                            price = extract_price_from_text(attr_value)
-                            if price:
-                                return price
-            except Exception:
-                continue
-
-        # Strategy 3: Search entire HTML for price patterns
-        price_regex = re.compile(r'€\s*(\d{2,4}(?:[.,]\d{2})?)', re.IGNORECASE)
-        matches = price_regex.findall(html_content)
-
-        for match in matches:
-            try:
-                # Handle both comma and dot as decimal separator
-                price_str = match.replace(',', '.')
-                price_num = float(price_str)
-                if 100 <= price_num <= 1500:
-                    return f"€{price_num}"
-            except ValueError:
-                continue
-
-        return None
-
-    except Exception as e:
-        print(f"Error in enhanced HTML price extraction: {e}")
-        return None
-
-
 def extract_price_from_text(text):
     """Extract and validate price from text"""
     if not text:
@@ -362,37 +436,48 @@ def extract_price_from_text(text):
     return None
 
 
-def fetch_flight_price_skyscanner_only(country):
-    """Fetch flight prices from Skyscanner only using requests"""
-
-    delay = random.uniform(10, 20)
-    print(f"⏱️  Waiting {delay:.1f} seconds before scraping...")
-    time.sleep(delay)
-
+def fetch_flight_price_pegasus_only(country):
+    """Fetch flight prices from Pegasus Airlines only"""
     try:
-        print(f"🔍 Scraping Skyscanner with requests...")
-        price, method = scrape_skyscanner_requests()
+        print(f"\n🇹🇷 Fetching Pegasus Airlines prices via {country}...")
 
-        if price and method and "error" not in price.lower() and "failed" not in method.lower():
-            if any(currency in price for currency in ['€', '$', '£']):
-                logger.info(f"SUCCESS with Skyscanner: {price}")
-                return price, method
-            else:
-                logger.info(f"Skyscanner returned: {price} (no currency found)")
-        else:
-            logger.info(f"Skyscanner returned: {price} via {method}")
+        # Connect to VPN
+        connect_vpn(country)
+
+        # Get current IP
+        current_ip = get_current_ip()
+        print(f"🌐 Current IP: {current_ip}")
+
+        # Scrape Pegasus
+        price, source = scrape_pegasus_airlines()
+
+        # Disconnect VPN
+        disconnect_vpn()
+
+        return {
+            'Country': country,
+            'IP': current_ip,
+            'Price': price,
+            'Source': source,
+            'Timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+        }
 
     except Exception as e:
-        logger.error(f"Skyscanner failed: {e}")
-
-    logger.error("Skyscanner scraping failed")
-    return "Skyscanner scraping failed", "No data available"
+        logger.error(f"Pegasus fetching failed for {country}: {e}")
+        disconnect_vpn()  # Ensure VPN is disconnected
+        return {
+            'Country': country,
+            'IP': 'Unknown',
+            'Price': f'Error: {str(e)}',
+            'Source': 'Pegasus Error',
+            'Timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+        }
 
 
 # Main agent loop
 def run_agent():
-    print("🚀 Starting Skyscanner-only flight price monitoring agent...")
-    print("🕷️  Skyscanner ONLY - with human-like behavior simulation")
+    print("🚀 Starting Pegasus Airlines-only flight price monitoring agent...")
+    print("🕷️  Pegasus Airlines ONLY - with human-like behavior simulation")
     print("❌ NO simulation fallback - real data only")
     print(f"📊 Results will be saved to: {RESULTS_FILE}")
     print(f"🐛 Debug mode: {DEBUG_MODE}")
@@ -406,27 +491,10 @@ def run_agent():
             print(f"\n{'='*60}")
             print(f"🌍 Processing: {country}")
 
-            # Connect to VPN
-            connect_vpn(country)
+            result = fetch_flight_price_pegasus_only(country)
 
-            # Verify connection
-            current_ip = get_current_ip()
-            print(f"🌐 Current IP: {current_ip}")
-
-            # Fetch price using Skyscanner only
-            print("💰 Scraping Skyscanner with requests...")
-            price, method = fetch_flight_price_skyscanner_only(country)
-
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            print(f"💸 {country}: {price} (via {method})")
-
-            # Save results
-            writer.writerow([country, current_ip, price, timestamp, method])
+            writer.writerow([result['Country'], result['IP'], result['Price'], result['Timestamp'], result['Source']])
             file.flush()
-
-            # Disconnect VPN
-            disconnect_vpn()
 
             print(f"✅ Completed: {country}")
 
