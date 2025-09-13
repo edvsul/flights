@@ -14,7 +14,7 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-COUNTRIES = ["Germany", "India", "Mexico", "Turkey", "Thailand"]
+COUNTRIES = ["Germany", "India"]
 RESULTS_FILE = "flight_prices.csv"
 DEBUG_MODE = True  # Set to True for detailed debugging
 
