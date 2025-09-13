@@ -8,7 +8,7 @@ import os
 import random
 from urllib.parse import urlencode
 
-COUNTRIES = ["Germany", "India", "Mexico", "Turkey", "Thailand"]
+COUNTRIES = ["Germany", "India"]
 RESULTS_FILE = "flight_prices.csv"
 
 # VPN control
