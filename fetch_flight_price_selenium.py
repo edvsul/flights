@@ -9,15 +9,12 @@ import random
 import logging
 import re
 
-# Selenium imports
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
+# Undetected Chrome driver for advanced bot detection bypass
+import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
-from webdriver_manager.chrome import ChromeDriverManager
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -50,37 +47,61 @@ def get_current_ip():
         return "Unknown"
 
 def create_selenium_driver():
-    """Create a Selenium Chrome driver with stealth options"""
-    chrome_options = Options()
-
-    # Stealth options
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    chrome_options.add_experimental_option('useAutomationExtension', False)
-
-    # Realistic browser settings
-    chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36")
-
-    # Performance options
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-plugins")
-    chrome_options.add_argument("--disable-images")  # Faster loading
-
-    # Run in headless mode for server
-    chrome_options.add_argument("--headless")
-
+    """Create an undetected Selenium Chrome driver with stealth options"""
     try:
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        # Use undetected-chromedriver with advanced stealth
+        options = uc.ChromeOptions()
 
-        # Execute script to remove webdriver property
+        # Basic stealth options
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+
+        # Advanced anti-detection
+        options.add_argument("--disable-web-security")
+        options.add_argument("--allow-running-insecure-content")
+        options.add_argument("--disable-features=VizDisplayCompositor")
+        options.add_argument("--disable-ipc-flooding-protection")
+        options.add_argument("--disable-background-timer-throttling")
+        options.add_argument("--disable-backgrounding-occluded-windows")
+        options.add_argument("--disable-renderer-backgrounding")
+
+        # Performance options
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-plugins")
+        options.add_argument("--memory-pressure-off")
+
+        # Window size (important for detection)
+        options.add_argument("--window-size=1920,1080")
+
+        # Run in headless mode
+        options.add_argument("--headless=new")  # Use new headless mode
+
+        # Create undetected Chrome driver
+        driver = uc.Chrome(
+            options=options,
+            version_main=None,  # Auto-detect Chrome version
+            driver_executable_path=None,  # Auto-download driver
+            browser_executable_path=None,  # Use system Chrome
+            user_data_dir=None,  # Use temp profile
+            suppress_welcome=True,
+            use_subprocess=True,
+            debug=False
+        )
+
+        # Additional stealth measures
         driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        driver.execute_script("Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]})")
+        driver.execute_script("Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']})")
+        driver.execute_script("window.chrome = { runtime: {} }")
+
+        # Set realistic viewport
+        driver.set_window_size(1920, 1080)
 
         return driver
+
     except Exception as e:
-        logger.error(f"Failed to create Chrome driver: {e}")
+        logger.error(f"Failed to create undetected Chrome driver: {e}")
         return None
 
 def save_debug_html(content, filename):
@@ -203,12 +224,12 @@ def fetch_flight_price_skyscanner_only(country):
 # Main agent loop
 def run_agent():
     print("🚀 Starting Skyscanner-only flight price monitoring agent...")
-    print("🤖 Using Selenium for JavaScript rendering")
-    print("🕷️  Skyscanner ONLY - no other sites")
+    print("🤖 Using UNDETECTED Chrome for advanced bot bypass")
+    print("🕷️  Skyscanner ONLY - with human-like behavior simulation")
     print("❌ NO simulation fallback - real data only")
     print(f"📊 Results will be saved to: {RESULTS_FILE}")
     print(f"🐛 Debug mode: {DEBUG_MODE}")
-    print("\n⚠️  Requirements: Chrome browser and chromedriver installed")
+    print("\n⚠️  Requirements: Chrome browser and undetected-chromedriver installed")
 
     with open(RESULTS_FILE, mode='w', newline='') as file:
         writer = csv.writer(file)
@@ -226,7 +247,7 @@ def run_agent():
             print(f"🌐 Current IP: {current_ip}")
 
             # Fetch price using Skyscanner only
-            print("💰 Scraping Skyscanner with Selenium...")
+            print("💰 Scraping Skyscanner with undetected Chrome...")
             price, method = fetch_flight_price_skyscanner_only(country)
 
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
