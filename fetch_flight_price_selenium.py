@@ -47,62 +47,72 @@ def get_current_ip():
         return "Unknown"
 
 def create_selenium_driver(headless=True):
-    """Create an undetected Selenium Chrome driver with stealth options"""
+    """Create Selenium WebDriver with advanced anti-detection"""
     try:
-        # Use undetected-chromedriver with advanced stealth
+        print("🤖 Creating undetected Chrome driver with advanced stealth...")
+
+        # Advanced Chrome options for maximum stealth
         options = uc.ChromeOptions()
 
-        # Server-specific options for EC2
+        # Essential stealth options
+        if headless:
+            options.add_argument("--headless=new")
+
+        # Anti-detection arguments
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--disable-software-rasterizer")
-        options.add_argument("--disable-background-timer-throttling")
-        options.add_argument("--disable-backgrounding-occluded-windows")
-        options.add_argument("--disable-renderer-backgrounding")
-        options.add_argument("--disable-features=TranslateUI")
-        options.add_argument("--disable-ipc-flooding-protection")
-
-        # Memory and performance for server
-        options.add_argument("--memory-pressure-off")
-        options.add_argument("--max_old_space_size=4096")
-        options.add_argument("--single-process")  # Important for server environments
-
-        # Always use headless on server
-        options.add_argument("--headless=new")
-        options.add_argument("--window-size=1366,768")
-
-        # Disable unnecessary features
+        options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-plugins")
         options.add_argument("--disable-images")
-        options.add_argument("--disable-javascript")  # We don't need JS for basic scraping
+        options.add_argument("--disable-javascript")  # Temporarily disable to avoid detection
+        options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
-        # Create undetected Chrome driver with server-friendly settings
-        driver = uc.Chrome(
-            options=options,
-            version_main=None,
-            driver_executable_path=None,
-            browser_executable_path=None,
-            user_data_dir=None,
-            suppress_welcome=True,
-            use_subprocess=False,  # Better for server environments
-            debug=False,
-            keep_alive=False  # Don't keep alive on server
-        )
+        # Memory and performance
+        options.add_argument("--memory-pressure-off")
+        options.add_argument("--max_old_space_size=4096")
+        options.add_argument("--single-process")
 
-        # Basic stealth measures
-        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        # Network and security
+        options.add_argument("--disable-web-security")
+        options.add_argument("--disable-features=VizDisplayCompositor")
+        options.add_argument("--ignore-certificate-errors")
+        options.add_argument("--allow-running-insecure-content")
 
-        # Set timeout
-        driver.set_page_load_timeout(60)
-        driver.implicitly_wait(10)
+        # Create driver with version_main for compatibility
+        driver = uc.Chrome(options=options, version_main=120)
 
+        # Advanced stealth techniques
+        driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+            'source': '''
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined,
+                });
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5],
+                });
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['en-US', 'en'],
+                });
+                window.chrome = {
+                    runtime: {},
+                };
+                Object.defineProperty(navigator, 'permissions', {
+                    get: () => ({
+                        query: () => Promise.resolve({ state: 'granted' }),
+                    }),
+                });
+            '''
+        })
+
+        # Set realistic viewport
+        driver.set_window_size(1920, 1080)
+
+        logger.info("✅ Undetected Chrome driver created successfully")
         return driver
 
     except Exception as e:
-        logger.error(f"Failed to create undetected Chrome driver: {e}")
-        logger.info("Chrome driver failed - will use requests fallback")
+        logger.error(f"❌ Failed to create Chrome driver: {e}")
         return None
 
 def save_debug_html(content, filename):
