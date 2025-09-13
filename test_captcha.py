@@ -59,7 +59,7 @@ def test_skyscanner_selenium():
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
 
-        driver = uc.Chrome(options=options, version_main=120)
+        driver = uc.Chrome(options=options, version_main=140)
 
         url = "https://www.skyscanner.com/transport/flights/cph/ayt/251017/251024/?adults=1"
         driver.get(url)

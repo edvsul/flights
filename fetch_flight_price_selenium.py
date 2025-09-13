@@ -74,7 +74,7 @@ def create_selenium_driver(headless=True):
         options.add_argument("--disable-ipc-flooding-protection")
 
         # Realistic browser fingerprint
-        options.add_argument("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        options.add_argument("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36")
 
         # Memory and performance optimizations
         options.add_argument("--memory-pressure-off")
@@ -105,8 +105,28 @@ def create_selenium_driver(headless=True):
         }
         options.add_experimental_option("prefs", prefs)
 
-        # Create driver with specific version for stability
-        driver = uc.Chrome(options=options, version_main=120, driver_executable_path=None)
+        # Try multiple Chrome versions for compatibility
+        chrome_versions = [140, 139, 138, 120]  # Start with 140, fallback to others
+        driver = None
+
+        for version in chrome_versions:
+            try:
+                print(f"🔧 Attempting Chrome version {version}...")
+                driver = uc.Chrome(options=options, version_main=version, driver_executable_path=None, use_subprocess=True)
+                print(f"✅ Successfully created driver with Chrome version {version}")
+                break
+            except Exception as version_error:
+                print(f"❌ Chrome version {version} failed: {str(version_error)[:100]}...")
+                if driver:
+                    try:
+                        driver.quit()
+                    except:
+                        pass
+                driver = None
+                continue
+
+        if not driver:
+            raise Exception("Failed to create Chrome driver with any supported version")
 
         # Enhanced stealth techniques for PerimeterX bypass
         driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
@@ -177,7 +197,7 @@ def create_selenium_driver(headless=True):
 
         # Additional CDP commands for stealth
         driver.execute_cdp_cmd('Network.setUserAgentOverride', {
-            "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
             "acceptLanguage": "en-US,en;q=0.9",
             "platform": "MacIntel"
         })
@@ -290,7 +310,7 @@ def scrape_skyscanner_requests():
         print("🔄 Trying Skyscanner requests fallback...")
 
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9,de;q=0.8',
             'Accept-Encoding': 'gzip, deflate, br',
