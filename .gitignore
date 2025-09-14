@@ -47,3 +47,11 @@ Thumbs.db
 # Project specific
 flight_prices.csv
 *.log
+
+# Generated files
+*.png
+*.csv
+debug_*.html
+*_element_sample.html
+*_dropdown_content.html
+flights_venv/
