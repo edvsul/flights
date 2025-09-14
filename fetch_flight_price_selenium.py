@@ -160,14 +160,17 @@ def make_pegasus_driver(headless: bool = True) -> webdriver.Chrome:
 
 def build_pegasus_url(origin: str, destination: str, departure_date: str, return_date: str) -> str:
     """Build Pegasus Airlines search URL"""
+    # Use the actual Pegasus booking URL structure
     base = "https://web.flypgs.com/booking"
     params = {
         "language": "en",
         "adultCount": 1,
+        "childCount": 0,
+        "infantCount": 0,
         "arrivalPort": destination,
         "departurePort": origin,
         "currency": "EUR",
-        "dateOption": 1,
+        "dateOption": 1,  # Round trip
         "departureDate": departure_date,
         "returnDate": return_date,
         "ili": f"{origin}-{destination}",
@@ -191,15 +194,38 @@ def extract_pegasus_flights(driver) -> list[dict]:
     """Extract flight details from Pegasus Airlines results page"""
     flights = []
 
-    # Multiple selectors to find flight cards
+    print("🔍 Analyzing page structure...")
+
+    # Wait longer for dynamic content to load
+    time.sleep(10)
+
+    # Check if we're on the right page
+    current_url = driver.current_url
+    print(f"Current URL: {current_url}")
+
+    # Look for common Pegasus flight result selectors
     flight_selectors = [
-        ".flight-result",
+        # Common flight result selectors
         "[data-testid*='flight']",
-        ".fare-option",
+        "[class*='flight']",
+        "[class*='Flight']",
+        ".flight-card",
         ".flight-option",
+        ".flight-result",
+        ".fare-option",
         ".booking-option",
-        "[class*='flight-card']",
-        "[class*='FlightCard']"
+        "[class*='fare']",
+        "[class*='Fare']",
+        "[class*='price']",
+        "[class*='Price']",
+        # Pegasus specific selectors (based on common patterns)
+        "[class*='pgs']",
+        "[class*='Pgs']",
+        "[data-cy*='flight']",
+        "[data-cy*='fare']",
+        ".outbound-flight",
+        ".inbound-flight",
+        ".flight-segment"
     ]
 
     cards = []
@@ -208,32 +234,61 @@ def extract_pegasus_flights(driver) -> list[dict]:
             found_cards = driver.find_elements(By.CSS_SELECTOR, selector)
             if found_cards:
                 cards = found_cards
-                print(f"✅ Found {len(cards)} flight cards with selector: {selector}")
+                print(f"✅ Found {len(cards)} elements with selector: {selector}")
                 break
         except:
             continue
 
     if not cards:
-        print("❌ No flight cards found, trying alternative extraction...")
-        # Try to find any elements with price information
-        price_elements = driver.find_elements(By.XPATH, "//*[contains(text(), '€') or contains(text(), '₺')]")
-        for element in price_elements:
+        print("❌ No flight cards found with standard selectors")
+        print("🔍 Searching for any elements with price indicators...")
+
+        # Try to find any elements containing price information
+        price_patterns = ["€", "EUR", "TRY", "₺"]
+        for pattern in price_patterns:
             try:
-                text = element.text.strip()
-                price = extract_price_from_text(text)
-                if price:
-                    flights.append({
-                        "airline": "Pegasus Airlines",
-                        "price": price,
-                        "price_numeric": float(price.replace('€', '').replace(',', '.')),
-                        "departure_time": None,
-                        "arrival_time": None,
-                        "duration": None,
-                        "stops": None,
-                        "scraped_at": int(time.time())
-                    })
+                price_elements = driver.find_elements(By.XPATH, f"//*[contains(text(), '{pattern}')]")
+                if price_elements:
+                    print(f"Found {len(price_elements)} elements containing '{pattern}'")
+                    # Extract prices from these elements
+                    for element in price_elements[:5]:  # Limit to first 5 to avoid spam
+                        try:
+                            text = element.text.strip()
+                            if text and len(text) < 50:  # Reasonable price text length
+                                price = extract_price_from_text(text)
+                                if price:
+                                    flights.append({
+                                        "airline": "Pegasus Airlines",
+                                        "price": price,
+                                        "price_numeric": float(price.replace('€', '').replace('₺', '').replace(',', '.')),
+                                        "departure_time": None,
+                                        "arrival_time": None,
+                                        "duration": None,
+                                        "stops": None,
+                                        "scraped_at": int(time.time())
+                                    })
+                                    print(f"✅ Extracted price: {price}")
+                        except Exception as e:
+                            continue
+                    if flights:
+                        return flights
             except:
                 continue
+
+        # If still no results, check if we need to interact with the page
+        print("🔍 Checking for search buttons or forms...")
+        search_buttons = driver.find_elements(By.XPATH, "//*[contains(text(), 'Search') or contains(text(), 'Ara') or contains(@class, 'search') or contains(@class, 'Search')]")
+        if search_buttons:
+            print(f"Found {len(search_buttons)} potential search buttons")
+            try:
+                search_buttons[0].click()
+                print("Clicked search button, waiting for results...")
+                time.sleep(15)
+                # Retry extraction after clicking search
+                return extract_pegasus_flights(driver)
+            except:
+                print("Could not click search button")
+
         return flights
 
     # Extract details from each flight card
@@ -243,7 +298,7 @@ def extract_pegasus_flights(driver) -> list[dict]:
             price_selectors = [
                 ".price", "[data-testid*='price']", "[class*='price']", "[class*='Price']",
                 ".fare", "[class*='fare']", ".amount", "[class*='amount']",
-                ".total", "[class*='total']", ".currency"
+                ".total", "[class*='total']", ".currency", "[class*='currency']"
             ]
 
             price = None
