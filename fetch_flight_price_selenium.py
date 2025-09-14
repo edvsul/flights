@@ -9,6 +9,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import pandas as pd
 from datetime import datetime, timedelta
+import tempfile
+import os
 
 class GoogleFlightsScraper:
     def __init__(self, headless=True):
@@ -19,17 +21,29 @@ class GoogleFlightsScraper:
         """Setup Chrome driver with optimized options"""
         chrome_options = Options()
 
-        if headless:
-            chrome_options.add_argument("--headless")
+        # Force headless mode for server environments
+        chrome_options.add_argument("--headless=new")
 
-        # Essential options for stability
+        # Essential options for stability and server environments
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_argument("--remote-debugging-port=9222")
+
+        # Fix user data directory conflicts
+        temp_dir = tempfile.mkdtemp()
+        chrome_options.add_argument(f"--user-data-dir={temp_dir}")
+
+        # Additional server environment fixes
+        chrome_options.add_argument("--disable-background-timer-throttling")
+        chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+        chrome_options.add_argument("--disable-renderer-backgrounding")
+        chrome_options.add_argument("--disable-features=TranslateUI")
+        chrome_options.add_argument("--disable-ipc-flooding-protection")
 
         # Anti-detection measures
-        chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36")
         chrome_options.add_argument("--disable-blink-features=AutomationControlled")
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
@@ -38,19 +52,49 @@ class GoogleFlightsScraper:
         chrome_options.add_argument("--disable-extensions")
         chrome_options.add_argument("--disable-plugins")
         chrome_options.add_argument("--disable-images")
+        chrome_options.add_argument("--disable-javascript")
+        chrome_options.add_argument("--disable-default-apps")
+
+        # Memory and process optimizations
+        chrome_options.add_argument("--memory-pressure-off")
+        chrome_options.add_argument("--max_old_space_size=4096")
 
         try:
+            # First, try to remove old chromedriver from PATH if it exists
+            old_driver_path = "/usr/bin/chromedriver"
+            if os.path.exists(old_driver_path):
+                print(f"⚠️ Found old ChromeDriver at {old_driver_path}")
+                print("💡 Consider removing it: sudo rm /usr/bin/chromedriver")
+
+            # Use webdriver-manager to get compatible ChromeDriver
+            print("🔄 Installing compatible ChromeDriver...")
             service = Service(ChromeDriverManager().install())
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
-        except:
-            self.driver = webdriver.Chrome(options=chrome_options)
+            print("✅ ChromeDriver installed successfully")
+
+        except Exception as e:
+            print(f"❌ ChromeDriver installation failed: {e}")
+            print("🔄 Trying fallback method...")
+
+            # Fallback: try system ChromeDriver with additional options
+            try:
+                chrome_options.add_argument("--disable-web-security")
+                chrome_options.add_argument("--allow-running-insecure-content")
+                self.driver = webdriver.Chrome(options=chrome_options)
+                print("✅ Using system ChromeDriver")
+            except Exception as e2:
+                print(f"❌ System ChromeDriver also failed: {e2}")
+                raise Exception("Could not initialize ChromeDriver. Please ensure Chrome and compatible ChromeDriver are installed.")
 
         # Hide webdriver property
-        self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        try:
+            self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        except:
+            pass
 
         # Set timeouts
         self.driver.implicitly_wait(10)
-        self.driver.set_page_load_timeout(30)
+        self.driver.set_page_load_timeout(60)
 
     def search_flights(self, origin="CPH", destination="AYT", departure_date=None, return_date=None):
         """Search for flights on Google Flights"""
@@ -279,7 +323,7 @@ def main():
         )
 
         if flights:
-            print(f"\n� Found {len(flights)} flights:")
+            print(f"\n🔍 Found {len(flights)} flights:")
             for i, flight in enumerate(flights, 1):
                 print(f"{i}. {flight['price']} - {flight['airline']} - {flight['duration']}")
 
