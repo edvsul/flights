@@ -79,7 +79,7 @@ class GoogleFlightsScraper:
         # Performance optimizations
         chrome_options.add_argument("--disable-plugins")
         chrome_options.add_argument("--disable-images")
-        chrome_options.add_argument("--disable-javascript")
+        # Remove --disable-javascript to allow consent page interaction
 
         try:
             # First, try to remove old chromedriver from PATH if it exists
@@ -146,27 +146,7 @@ class GoogleFlightsScraper:
 
             # Handle cookie consent if present
             try:
-                cookie_selectors = [
-                    "//button[contains(text(), 'Accept')]",
-                    "//button[contains(text(), 'I agree')]",
-                    "//button[contains(text(), 'OK')]",
-                    "//button[contains(text(), 'Accept all')]",
-                    "//*[@id='L2AGLb']",  # Google's "Accept all" button
-                    "//div[contains(text(), 'Accept')]//parent::button"
-                ]
-
-                for selector in cookie_selectors:
-                    try:
-                        cookie_button = WebDriverWait(self.driver, 3).until(
-                            EC.element_to_be_clickable((By.XPATH, selector))
-                        )
-                        cookie_button.click()
-                        time.sleep(2)
-                        print("✅ Cookie consent accepted")
-                        break
-                    except TimeoutException:
-                        continue
-
+                self.handle_consent_page()
             except Exception as e:
                 print(f"ℹ️ No cookie consent found or error: {e}")
 
@@ -218,6 +198,141 @@ class GoogleFlightsScraper:
             # Save debug HTML on error
             self.save_debug_html("google_flights_error")
             return []
+
+    def handle_consent_page(self):
+        """Handle Google consent page"""
+        try:
+            print("🔄 Attempting to handle consent page...")
+
+            # Wait a bit for page to load
+            time.sleep(5)
+
+            # Save consent page HTML for debugging
+            self.save_debug_html("consent_page")
+
+            # Try multiple consent button selectors with more aggressive approach
+            consent_selectors = [
+                # Common Google consent buttons
+                "//button[contains(text(), 'Accept all')]",
+                "//button[contains(text(), 'I agree')]",
+                "//button[contains(text(), 'Accept')]",
+                "//button[contains(text(), 'OK')]",
+                "//button[contains(text(), 'Agree')]",
+                "//button[contains(text(), 'Continue')]",
+                "//*[@id='L2AGLb']",  # Common Google consent button ID
+                "//div[contains(text(), 'Accept')]//parent::button",
+                "//div[contains(text(), 'I agree')]//parent::button",
+                "//span[contains(text(), 'Accept')]//parent::button",
+
+                # CSS selectors for Material Design buttons
+                "button[jsname='V67aGc']",  # Google's accept button
+                "button[data-ved]",  # Buttons with data-ved attribute
+                ".VfPpkd-LgbsSe[jsname='V67aGc']",  # Material design button
+                ".VfPpkd-LgbsSe",  # Any material design button
+                "button[type='button']",  # Generic buttons
+
+                # More specific consent selectors
+                "//button[contains(@aria-label, 'Accept')]",
+                "//button[contains(@aria-label, 'agree')]",
+                "//button[contains(@title, 'Accept')]",
+                "//input[@type='submit' and contains(@value, 'Accept')]",
+
+                # Form submission buttons
+                "//form//button[position()=last()]",  # Last button in form
+                "//form//input[@type='submit']"  # Submit inputs in forms
+            ]
+
+            # Try each selector with different interaction methods
+            for selector in consent_selectors:
+                try:
+                    if selector.startswith("//"):
+                        # XPath selector
+                        elements = self.driver.find_elements(By.XPATH, selector)
+                    else:
+                        # CSS selector
+                        elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+
+                    for element in elements:
+                        try:
+                            # Check if element is visible and clickable
+                            if element.is_displayed() and element.is_enabled():
+                                # Try multiple click methods
+                                click_methods = [
+                                    lambda: element.click(),
+                                    lambda: self.driver.execute_script("arguments[0].click();", element),
+                                    lambda: self.driver.execute_script("arguments[0].dispatchEvent(new MouseEvent('click', {bubbles: true}));", element)
+                                ]
+
+                                for click_method in click_methods:
+                                    try:
+                                        # Scroll to element first
+                                        self.driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", element)
+                                        time.sleep(1)
+
+                                        # Try the click method
+                                        click_method()
+                                        print(f"✅ Clicked consent button using selector: {selector}")
+                                        time.sleep(5)
+
+                                        # Check if we're still on consent page
+                                        current_url = self.driver.current_url
+                                        if "consent" not in current_url:
+                                            print("✅ Successfully bypassed consent page!")
+                                            return True
+                                        else:
+                                            print("⚠️ Still on consent page, trying next method...")
+
+                                    except Exception as click_error:
+                                        continue
+
+                        except Exception as element_error:
+                            continue
+
+                except Exception as selector_error:
+                    continue
+
+            # If clicking buttons didn't work, try form submission
+            print("🔄 Trying form submission approach...")
+            try:
+                forms = self.driver.find_elements(By.TAG_NAME, "form")
+                for form in forms:
+                    try:
+                        self.driver.execute_script("arguments[0].submit();", form)
+                        time.sleep(5)
+                        if "consent" not in self.driver.current_url:
+                            print("✅ Form submission successful!")
+                            return True
+                    except:
+                        continue
+            except:
+                pass
+
+            # If nothing worked, try direct navigation with consent bypass
+            print("🔄 Trying direct navigation bypass...")
+            bypass_urls = [
+                "https://www.google.com/travel/flights?hl=en&gl=US&consent=PENDING+999",
+                "https://www.google.com/travel/flights?hl=en&gl=US&pws=0",
+                "https://www.google.com/travel/flights?hl=en&gl=US&safe=off",
+                "https://www.google.com/travel/flights?hl=en&gl=US"
+            ]
+
+            for bypass_url in bypass_urls:
+                try:
+                    self.driver.get(bypass_url)
+                    time.sleep(8)
+                    current_url = self.driver.current_url
+                    if "travel/flights" in current_url and "consent" not in current_url:
+                        print(f"✅ Direct navigation successful: {bypass_url}")
+                        return True
+                except:
+                    continue
+
+            print("❌ All consent bypass methods failed")
+            return False
+
+        except Exception as e:
+            print(f"❌ Error handling consent: {e}")
+            return False
 
     def save_debug_html(self, filename):
         """Save page source for debugging"""
