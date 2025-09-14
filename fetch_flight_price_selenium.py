@@ -412,6 +412,20 @@ def fetch_flight_price_pegasus_only(country):
         }
 
 
+def test_enhanced_scraper():
+    """Test the enhanced Pegasus scraper without VPN connection"""
+    print("🧪 Testing enhanced Pegasus Selenium scraper...")
+
+    try:
+        # Test without VPN for quick validation
+        price, source = scrape_pegasus_selenium()
+        print(f"✅ Test result: {price} from {source}")
+        return True
+    except Exception as e:
+        print(f"❌ Test failed: {e}")
+        return False
+
+
 # Main agent loop
 def run_agent():
     print("🚀 Starting Pegasus Airlines-only flight price monitoring agent...")
@@ -441,4 +455,6 @@ def run_agent():
 
 
 if __name__ == "__main__":
-    run_agent()
+    # Uncomment the line below to test the enhanced scraper
+    test_enhanced_scraper()
+    #run_agent()
