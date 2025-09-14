@@ -9,6 +9,7 @@ import random
 import logging
 import re
 import json
+from typing import Optional, Union
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -141,7 +142,7 @@ def make_pegasus_driver(headless: bool = True) -> webdriver.Chrome:
     opts.add_argument("--disable-extensions")
     opts.add_argument("--disable-plugins")
     opts.add_argument("--disable-images")
-    opts.add_argument("--disable-javascript")  # Remove this if JS is needed for price loading
+    # opts.add_argument("--disable-javascript")  # Removed - JS needed for price loading
 
     # Use webdriver-manager for automatic ChromeDriver management
     try:
@@ -177,7 +178,7 @@ def build_pegasus_url(origin: str, destination: str, departure_date: str, return
     return f"{base}?{urlencode(params)}"
 
 
-def get_text_safe(parent, css: str) -> str | None:
+def get_text_safe(parent, css: str) -> Optional[str]:
     """Safely get text from CSS selector"""
     try:
         element = parent.find_element(By.CSS_SELECTOR, css)
