@@ -108,36 +108,64 @@ class GoogleFlightsScraper:
             print(f"🔍 Searching flights from {origin} to {destination}")
             print(f"📅 Departure: {departure_date}, Return: {return_date}")
 
-            # Build Google Flights URL
+            # Build Google Flights URL with proper format
             base_url = "https://www.google.com/travel/flights"
-            url = f"{base_url}?q=Flights%20to%20{destination}%20from%20{origin}%20on%20{departure_date}%20through%20{return_date}"
+            # Use the correct Google Flights URL structure
+            url = f"{base_url}?tfs=CBwQAhooEgoyMDI1LTEwLTE3agcIARIDQ1BIcgcIARIDQVlUGgoyMDI1LTEwLTI0&hl=en&curr=EUR"
 
             print(f"🌐 Loading: {url}")
             self.driver.get(url)
 
             # Wait for page to load
-            time.sleep(5)
+            time.sleep(8)
+
+            # Save debug HTML to see what we're getting
+            self.save_debug_html("google_flights_initial")
 
             # Handle cookie consent if present
             try:
-                cookie_button = WebDriverWait(self.driver, 5).until(
-                    EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Accept') or contains(text(), 'I agree') or contains(text(), 'OK')]"))
-                )
-                cookie_button.click()
-                time.sleep(2)
-                print("✅ Cookie consent accepted")
-            except TimeoutException:
-                print("ℹ️ No cookie consent found")
+                cookie_selectors = [
+                    "//button[contains(text(), 'Accept')]",
+                    "//button[contains(text(), 'I agree')]",
+                    "//button[contains(text(), 'OK')]",
+                    "//button[contains(text(), 'Accept all')]",
+                    "//*[@id='L2AGLb']",  # Google's "Accept all" button
+                    "//div[contains(text(), 'Accept')]//parent::button"
+                ]
 
-            # Wait for flight results to load
+                for selector in cookie_selectors:
+                    try:
+                        cookie_button = WebDriverWait(self.driver, 3).until(
+                            EC.element_to_be_clickable((By.XPATH, selector))
+                        )
+                        cookie_button.click()
+                        time.sleep(2)
+                        print("✅ Cookie consent accepted")
+                        break
+                    except TimeoutException:
+                        continue
+
+            except Exception as e:
+                print(f"ℹ️ No cookie consent found or error: {e}")
+
+            # Wait for flight results to load with more comprehensive selectors
             print("⏳ Waiting for flight results...")
             try:
-                WebDriverWait(self.driver, 30).until(
+                WebDriverWait(self.driver, 45).until(
                     EC.any_of(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='flight-offer']")),
+                        # Updated Google Flights selectors
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid*='flight']")),
                         EC.presence_of_element_located((By.CSS_SELECTOR, ".pIav2d")),
-                        EC.presence_of_element_located((By.CSS_SELECTOR, "[jsname='IWWDBc']")),
-                        EC.presence_of_element_located((By.XPATH, "//*[contains(@class, 'flight') or contains(@data-testid, 'flight')]"))
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "[jsname]")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, ".yR1fYc")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "[role='listitem']")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, ".JMc5Xc")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "[class*='flight']")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "[class*='price']")),
+                        EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '€') or contains(text(), '$') or contains(text(), 'kr')]")),
+                        # Look for any elements that might contain flight info
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "[data-ved]")),
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[role='button']"))
                     )
                 )
                 print("✅ Flight results loaded")
@@ -145,7 +173,18 @@ class GoogleFlightsScraper:
                 print("⚠️ Timeout waiting for results")
 
             # Additional wait for dynamic content
-            time.sleep(10)
+            time.sleep(15)
+
+            # Save debug HTML after waiting
+            self.save_debug_html("google_flights_after_wait")
+
+            # Check current URL to see if we were redirected
+            current_url = self.driver.current_url
+            print(f"📍 Current URL: {current_url}")
+
+            # Check page title
+            page_title = self.driver.title
+            print(f"📄 Page title: {page_title}")
 
             # Extract flight data
             flights = self.extract_flight_data()
@@ -154,7 +193,18 @@ class GoogleFlightsScraper:
 
         except Exception as e:
             print(f"❌ Error searching flights: {e}")
+            # Save debug HTML on error
+            self.save_debug_html("google_flights_error")
             return []
+
+    def save_debug_html(self, filename):
+        """Save page source for debugging"""
+        try:
+            with open(f"debug_{filename}.html", "w", encoding="utf-8") as f:
+                f.write(self.driver.page_source)
+            print(f"🐛 Debug HTML saved: debug_{filename}.html")
+        except Exception as e:
+            print(f"⚠️ Could not save debug HTML: {e}")
 
     def extract_flight_data(self):
         """Extract flight information from the page"""
