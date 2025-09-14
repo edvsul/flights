@@ -42,22 +42,44 @@ class GoogleFlightsScraper:
         chrome_options.add_argument("--disable-features=TranslateUI")
         chrome_options.add_argument("--disable-ipc-flooding-protection")
 
-        # Anti-detection measures
-        chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36")
+        # Enhanced anti-detection and consent bypass measures
+        chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
         chrome_options.add_argument("--disable-blink-features=AutomationControlled")
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
 
-        # Performance optimizations
+        # Location and language settings to avoid consent redirects
+        chrome_options.add_argument("--lang=en-US")
+        chrome_options.add_argument("--accept-lang=en-US,en;q=0.9")
+
+        # Disable consent and privacy features
+        chrome_options.add_argument("--disable-features=VizDisplayCompositor,PrivacySandboxSettings4")
+        chrome_options.add_argument("--disable-component-extensions-with-background-pages")
+        chrome_options.add_argument("--disable-default-apps")
         chrome_options.add_argument("--disable-extensions")
+
+        # Set preferences to bypass consent
+        prefs = {
+            "profile.default_content_setting_values": {
+                "cookies": 1,
+                "images": 2,
+                "plugins": 2,
+                "popups": 2,
+                "geolocation": 2,
+                "notifications": 2,
+                "media_stream": 2,
+            },
+            "profile.managed_default_content_settings": {
+                "images": 2
+            },
+            "profile.cookie_controls_mode": 0
+        }
+        chrome_options.add_experimental_option("prefs", prefs)
+
+        # Performance optimizations
         chrome_options.add_argument("--disable-plugins")
         chrome_options.add_argument("--disable-images")
         chrome_options.add_argument("--disable-javascript")
-        chrome_options.add_argument("--disable-default-apps")
-
-        # Memory and process optimizations
-        chrome_options.add_argument("--memory-pressure-off")
-        chrome_options.add_argument("--max_old_space_size=4096")
 
         try:
             # First, try to remove old chromedriver from PATH if it exists
