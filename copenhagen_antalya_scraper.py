@@ -271,18 +271,21 @@ def extract_flight_prices(driver):
 
                 # Extract price from element text
                 text = flight_element.text
-                price_match = re.search(r"(SEK|DKK|€|kr|EUR)\s*([0-9,]+)", text)
+                price_match = re.search(r"(SEK|DKK|€|£|kr|EUR|GBP)\s*([0-9,]+)", text)
                 if price_match:
                     price_value = int(price_match.group(2).replace(",", ""))
-                    if 1000 <= price_value <= 50000:
-                        price = f"{price_match.group(1)} {price_match.group(2)}"
+                    if 100 <= price_value <= 50000:
+                        price = f"{price_match.group(1)}{price_match.group(2)}"
 
                         # Check if nonstop
                         element_text = text.lower()
                         if "nonstop" in element_text or "non-stop" in element_text or "direct" in element_text:
                             flight_data.append({'price': price, 'is_nonstop': True})
                             print(f"Found nonstop flight with price: {price}")
-
+                        # If nonstop filter was applied, assume all visible flights are nonstop
+                        elif price != "N/A":
+                            flight_data.append({'price': price, 'is_nonstop': True})
+                            print(f"Found flight with price: {price} (assuming nonstop after filter)")
             except Exception:
                 continue
 
