@@ -244,15 +244,25 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
                         if nonstop_radio.get_attribute("aria-checked") == "true":
                             print("Successfully selected non-stop only option!")
 
-                        # Click Done/Apply button to apply the filter
+                        # Apply the filter
                         done_buttons = driver.find_elements(By.XPATH,
-                            "//button[contains(text(), 'Done') or contains(@aria-label, 'Done') or contains(text(), 'Apply')]")
+                            "//button[contains(text(), 'Done') or contains(@aria-label, 'Done')]")
                         if done_buttons:
-                            actions = ActionChains(driver)
-                            actions.move_to_element(done_buttons[0]).click().perform()
-                            print("Clicked Done button to apply filter")
+                            try:
+                                # Wait for button to be clickable
+                                WebDriverWait(driver, 5).until(
+                                    EC.element_to_be_clickable(done_buttons[0])
+                                )
+                                actions.move_to_element(done_buttons[0]).click().perform()
+                                print("Applied non-stop filter")
+                            except:
+                                # Fallback to JavaScript click
+                                try:
+                                    driver.execute_script("arguments[0].click();", done_buttons[0])
+                                    print("Applied non-stop filter (JavaScript)")
+                                except:
+                                    print("Could not click Done button")
                             time.sleep(3)
-                            driver.save_screenshot("after_filter_applied.png")
 
                         return True
                     else:
@@ -285,8 +295,20 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
                             done_buttons = driver.find_elements(By.XPATH,
                                 "//button[contains(text(), 'Done') or contains(@aria-label, 'Done')]")
                             if done_buttons:
-                                actions.move_to_element(done_buttons[0]).click().perform()
-                                print("Applied non-stop filter")
+                                try:
+                                    # Wait for button to be clickable
+                                    WebDriverWait(driver, 5).until(
+                                        EC.element_to_be_clickable(done_buttons[0])
+                                    )
+                                    actions.move_to_element(done_buttons[0]).click().perform()
+                                    print("Applied non-stop filter")
+                                except:
+                                    # Fallback to JavaScript click
+                                    try:
+                                        driver.execute_script("arguments[0].click();", done_buttons[0])
+                                        print("Applied non-stop filter (JavaScript)")
+                                    except:
+                                        print("Could not click Done button")
                                 time.sleep(3)
 
                             return True
