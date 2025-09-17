@@ -629,20 +629,36 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
         # Create a simple visualization of prices
         if not df.empty and 'Price' in df.columns:
             # Clean price data (remove currency symbols and convert to numeric)
-            df['Price_Numeric'] = df['Price'].str.replace(r'[^\d.]', '', regex=True).astype(float)
+            # Filter out N/A and empty prices first
+            valid_prices = df[df['Price'] != 'N/A']['Price']
+            if not valid_prices.empty:
+                # Remove currency symbols and convert to numeric, handling empty strings
+                numeric_prices = []
+                for price in valid_prices:
+                    try:
+                        cleaned_price = re.sub(r'[^\d.]', '', str(price))
+                        if cleaned_price and cleaned_price != '.':
+                            numeric_prices.append(float(cleaned_price))
+                    except (ValueError, TypeError):
+                        continue
 
-            plt.figure(figsize=(10, 6))
-            plt.bar(range(len(df)), df['Price_Numeric'])
-            plt.xlabel('Flight Options')
-            plt.ylabel('Price')
-            plt.title(f'Flight Prices from {origin} to {destination}')
-            plt.tight_layout()
+                if numeric_prices:
+                    plt.figure(figsize=(10, 6))
+                    plt.bar(range(len(numeric_prices)), numeric_prices)
+                    plt.xlabel('Flight Options')
+                    plt.ylabel('Price')
+                    plt.title(f'Flight Prices from {origin} to {destination}')
+                    plt.tight_layout()
 
-            # Save the visualization with consistent naming
-            chart_file = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}_prices.png"
-            plt.savefig(chart_file)
-            print(f"Price chart saved to {chart_file}")
-
+                    # Save the visualization with consistent naming
+                    chart_file = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}_prices.png"
+                    plt.savefig(chart_file)
+                    print(f"Price chart saved to {chart_file}")
+                    plt.close()
+                else:
+                    print("No valid numeric prices found for visualization")
+            else:
+                print("No valid prices found for visualization")
         return df
 
     except Exception as e:
