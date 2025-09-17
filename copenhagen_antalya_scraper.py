@@ -13,22 +13,37 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import matplotlib.pyplot as plt
+import tempfile
 
 
 def setup_driver():
     """Set up and return a configured Chrome WebDriver."""
     chrome_options = Options()
-    chrome_options.add_argument("--window-size=1920,1080")
+
+    # Essential options for headless Linux operation
+    chrome_options.add_argument("--headless=new")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--disable-extensions")
     chrome_options.add_argument("--disable-notifications")
     chrome_options.add_argument("--disable-popup-blocking")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    # Comment the line below to see the browser window
-    # chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--window-size=1920,1080")
 
-    # Add user-agent to appear more like a regular user
-    chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    # Add unique user data directory to avoid conflicts
+    temp_dir = tempfile.mkdtemp()
+    chrome_options.add_argument(f"--user-data-dir={temp_dir}")
+
+    # Additional stability options for headless environments
+    chrome_options.add_argument("--disable-background-timer-throttling")
+    chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+    chrome_options.add_argument("--disable-renderer-backgrounding")
+    chrome_options.add_argument("--disable-features=TranslateUI")
+    chrome_options.add_argument("--disable-ipc-flooding-protection")
+
+    # Linux Chrome user agent
+    chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
     # Exclude automation flags to avoid detection
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
