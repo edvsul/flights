@@ -271,11 +271,11 @@ def extract_flight_prices(driver):
 
                 # Extract price from element text
                 text = flight_element.text
-                price_match = re.search(r"(SEK|DKK|€|£|kr|EUR|GBP)\s*([0-9,]+)", text)
+                price_match = re.search(r"(SEK|DKK|€|£|kr|EUR|GBP|CZK)\s*([0-9,]+)", text)
                 if price_match:
                     price_value = int(price_match.group(2).replace(",", ""))
-                    if 100 <= price_value <= 50000:
-                        price = f"{price_match.group(1)}{price_match.group(2)}"
+                    if 100 <= price_value <= 50000:  # Lowered minimum to catch €295 style prices
+                        price = f"{price_match.group(1)} {price_match.group(2)}"  # Keep space for CZK format
 
                         # Check if nonstop
                         element_text = text.lower()
@@ -295,7 +295,7 @@ def extract_flight_prices(driver):
     if not flight_data:
         print("No flight elements found, trying page text extraction")
         page_text = driver.find_element(By.TAG_NAME, "body").text
-        price_matches = re.findall(r"(DKK|SEK|€)\s*([0-9,]+)", page_text)
+        price_matches = re.findall(r"(DKK|SEK|€|£|kr|EUR|GBP|CZK)\s*([0-9,]+)", page_text)
 
         if price_matches:
             print(f"Found {len(price_matches)} price matches")
@@ -305,10 +305,10 @@ def extract_flight_prices(driver):
             for currency, price in price_matches:
                 try:
                     price_value = int(price.replace(",", ""))
-                    if 2000 <= price_value <= 10000 and price_value not in seen_prices:
-                        valid_prices.append(f"{currency} {price}")
+                    if 100 <= price_value <= 10000 and price_value not in seen_prices:
+                        valid_prices.append(f"{currency} {price}")  # Keep space for all currencies
                         seen_prices.add(price_value)
-                        if len(valid_prices) >= 2:
+                        if len(valid_prices) >= 3:  # Increased to 3 to catch more flights
                             break
                 except:
                     continue
