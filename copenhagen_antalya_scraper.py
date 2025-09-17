@@ -408,7 +408,7 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
             print("Could not find any flight elements with our selectors")
             # Try to extract flights directly from the page text
             page_text = driver.find_element(By.TAG_NAME, "body").text
-            price_matches = re.findall(r"(DKK|€|kr|EUR|$)\s*([0-9,]+)", page_text)
+            price_matches = re.findall(r"(SEK|DKK|€|kr|EUR|$)\s*([0-9,]+)", page_text)
 
             if price_matches:
                 print(f"Found {len(price_matches)} price matches in page text")
