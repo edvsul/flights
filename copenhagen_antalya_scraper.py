@@ -370,7 +370,7 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
             driver.save_screenshot("stops_button_error.png")
 
         # Additional wait for filtered results to load
-        time.sleep(5)
+        time.sleep(10)  # Increased wait time to ensure filter results are fully loaded
 
         # Extract flight data and save results
         try:
@@ -381,7 +381,7 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
             screenshot_file = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}.png"
             direct_flight_csv = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}_direct.csv"
 
-            # Take a screenshot of the flight results
+            # Take a screenshot of the flight results AFTER filtering
             driver.save_screenshot(screenshot_file)
             print(f"Screenshot saved to {screenshot_file}")
 
@@ -392,7 +392,7 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
             flight_elements = []
             flight_selectors = [
                 "li[role='listitem']",
-                "div[role='listitem']",
+                "div[role='listitem]",
                 "div[data-test-id='flight-card']",
                 "div[jsaction*='click']"
             ]
@@ -405,26 +405,56 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
                     break
 
             if flight_elements:
-                # Process flight elements to extract prices
-                for i, flight_element in enumerate(flight_elements[:10]):  # Limit to first 10
+                # Process flight elements to extract prices - only from visible elements
+                visible_flights = 0
+                for i, flight_element in enumerate(flight_elements):
                     try:
-                        # Extract price using multiple approaches
+                        # Skip if element is not displayed (filtered out)
+                        if not flight_element.is_displayed():
+                            continue
+
+                        # Check if this element is in the main results area (not sidebar/ads)
+                        element_location = flight_element.location
+                        element_size = flight_element.size
+                        if element_size['height'] < 50 or element_size['width'] < 200:
+                            continue  # Skip small elements that aren't flight cards
+
+                        visible_flights += 1
+                        if visible_flights > 10:  # Limit to first 10 visible flights
+                            break
+
+                        # Extract price using multiple approaches - more specific to Google Flights
                         price = "N/A"
                         price_selectors = [
-                            "span[aria-label*='price'] span",
+                            "span[data-gs]",  # Google Flights specific
+                            "div[data-gs] span",
+                            "span[aria-label*='price']",
                             "div[aria-label*='price']",
                             "*[class*='price']",
-                            "*[class*='Price']"
+                            "*[class*='Price']",
+                            "span:contains('DKK')",
+                            "div:contains('DKK')"
                         ]
 
                         for selector in price_selectors:
                             try:
-                                price_elements = flight_element.find_elements(By.CSS_SELECTOR, selector)
-                                if price_elements:
+                                if "contains" in selector:
+                                    # Use XPath for contains selectors
+                                    xpath_selector = f".//*[contains(text(), 'DKK')]"
+                                    price_elements = flight_element.find_elements(By.XPATH, xpath_selector)
+                                else:
+                                    price_elements = flight_element.find_elements(By.CSS_SELECTOR, selector)
+
+                                if price_elements and price_elements[0].is_displayed():
                                     price_text = price_elements[0].text.strip()
                                     if price_text and ("DKK" in price_text or "SEK" in price_text or "€" in price_text):
-                                        price = price_text
-                                        break
+                                        # Validate it's a reasonable flight price
+                                        price_match = re.search(r"(DKK|SEK|€)\s*([0-9,]+)", price_text)
+                                        if price_match:
+                                            price_value = int(price_match.group(2).replace(",", ""))
+                                            if 1000 <= price_value <= 50000:
+                                                price = price_text
+                                                break
                             except:
                                 continue
 
@@ -433,7 +463,9 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
                             text = flight_element.text
                             price_match = re.search(r"(SEK|DKK|€|kr|EUR)\s*([0-9,]+)", text)
                             if price_match:
-                                price = f"{price_match.group(1)} {price_match.group(2)}"
+                                price_value = int(price_match.group(2).replace(",", ""))
+                                if 1000 <= price_value <= 50000:
+                                    price = f"{price_match.group(1)} {price_match.group(2)}"
 
                         # Check if this appears to be a nonstop flight
                         is_nonstop = False
@@ -452,20 +484,64 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
                         print(f"Error extracting data for flight {i+1}: {e}")
                         continue
 
-            # If no flight elements found, try extracting prices directly from page text
+                print(f"Processed {visible_flights} visible flight elements")
+
+            # If no flight elements found, try extracting from specific flight results section
             if not flight_data:
-                print("No flight elements found, trying page text extraction")
-                page_text = driver.find_element(By.TAG_NAME, "body").text
-                price_matches = re.findall(r"(SEK|DKK|€|kr|EUR)\s*([0-9,]+)", page_text)
+                print("No flight elements found, trying targeted price extraction")
+
+                # Try to find the main results section first
+                results_sections = [
+                    "div[role='main']",
+                    "div[data-testid='flight-results']",
+                    "div[class*='results']",
+                    "div[class*='flight']"
+                ]
+
+                results_section = None
+                for section_selector in results_sections:
+                    try:
+                        sections = driver.find_elements(By.CSS_SELECTOR, section_selector)
+                        if sections:
+                            results_section = sections[0]
+                            print(f"Found results section with: {section_selector}")
+                            break
+                    except:
+                        continue
+
+                if results_section:
+                    # Extract prices only from the results section
+                    section_text = results_section.text
+                    price_matches = re.findall(r"(DKK|SEK|€)\s*([0-9,]+)", section_text)
+                else:
+                    # Fallback to full page but be more selective
+                    page_text = driver.find_element(By.TAG_NAME, "body").text
+                    price_matches = re.findall(r"(DKK|SEK|€)\s*([0-9,]+)", page_text)
 
                 if price_matches:
-                    print(f"Found {len(price_matches)} price matches in page text")
-                    # Take first few prices as potential nonstop flights
-                    for currency, price in price_matches[:3]:
+                    print(f"Found {len(price_matches)} price matches")
+                    # Filter and validate prices more carefully
+                    valid_prices = []
+                    seen_prices = set()
+
+                    for currency, price in price_matches:
+                        try:
+                            price_value = int(price.replace(",", ""))
+                            # Only include reasonable flight prices and avoid duplicates
+                            if 2000 <= price_value <= 10000 and price_value not in seen_prices:
+                                valid_prices.append(f"{currency} {price}")
+                                seen_prices.add(price_value)
+                                if len(valid_prices) >= 2:  # Limit to 2 prices max
+                                    break
+                        except:
+                            continue
+
+                    for price in valid_prices:
                         flight_data.append({
-                            'price': f"{currency} {price}",
+                            'price': price,
                             'is_nonstop': True
                         })
+                        print(f"Extracted price: {price}")
 
             # Write actual prices to CSV
             with open(direct_flight_csv, 'w', newline='') as f:
@@ -503,6 +579,7 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
         except Exception as e:
             print(f"Error in flight data extraction: {e}")
             return pd.DataFrame()
+
     except Exception as e:
         print(f"Error in scrape_flight_data function: {e}")
         driver.save_screenshot("scrape_flight_data_error.png")
