@@ -375,10 +375,10 @@ def main():
 
     # List of countries to test
     countries = [
-        "Bosnia and Herzegovina",
+        "Bosnia_And_Herzegovina",
         "Croatia",
         "Cyprus",
-        "Czech Republic",
+        "Czech_Republic",
         "Denmark",
         "Estonia"
     ]
