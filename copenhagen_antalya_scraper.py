@@ -3,6 +3,7 @@ import os
 import time
 import re
 import pandas as pd
+import subprocess
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -13,6 +14,53 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
 import tempfile
+
+
+def connect_to_vpn(country):
+    """Connect to NordVPN server in specified country."""
+    try:
+        print(f"Connecting to NordVPN server in {country}...")
+
+        # Disconnect any existing connection
+        subprocess.run(["nordvpn", "disconnect"], capture_output=True, text=True)
+        time.sleep(2)
+
+        # Connect to specified country
+        result = subprocess.run(["nordvpn", "connect", country], capture_output=True, text=True)
+
+        if result.returncode == 0:
+            print(f"Successfully connected to {country}")
+            time.sleep(5)  # Wait for connection to stabilize
+            return True
+        else:
+            print(f"Failed to connect to {country}: {result.stderr}")
+            return False
+
+    except Exception as e:
+        print(f"Error connecting to VPN: {e}")
+        return False
+
+
+def disconnect_vpn():
+    """Disconnect from NordVPN."""
+    try:
+        print("Disconnecting from VPN...")
+        subprocess.run(["nordvpn", "disconnect"], capture_output=True, text=True)
+        time.sleep(2)
+        print("Disconnected from VPN")
+    except Exception as e:
+        print(f"Error disconnecting from VPN: {e}")
+
+
+def get_current_ip():
+    """Get current IP address to verify VPN connection."""
+    try:
+        result = subprocess.run(["curl", "-s", "https://ipinfo.io/ip"], capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout.strip()
+        return "Unknown"
+    except:
+        return "Unknown"
 
 
 def setup_driver():
@@ -269,8 +317,8 @@ def extract_flight_prices(driver):
     return flight_data
 
 
-def scrape_flight_data(origin, destination, depart_date, return_date):
-    """Scrape flight data from Google Flights."""
+def scrape_flight_data_for_country(origin, destination, depart_date, return_date, country):
+    """Scrape flight data from Google Flights for a specific country."""
     driver = setup_driver()
 
     try:
@@ -296,51 +344,20 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
         apply_nonstop_filter(driver)
         time.sleep(10)  # Wait for filtered results
 
-        # Take screenshot and extract prices
+        # Take screenshot
         formatted_depart_date = depart_date.replace("-", "")
         formatted_return_date = return_date.replace("-", "")
-        screenshot_file = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}.png"
-        direct_flight_csv = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}_direct.csv"
+        screenshot_file = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}_{country.replace(' ', '_')}.png"
 
         driver.save_screenshot(screenshot_file)
         print(f"Screenshot saved to {screenshot_file}")
 
         flight_data = extract_flight_prices(driver)
-
-        # Save to CSV
-        with open(direct_flight_csv, 'w', newline='') as f:
-            if flight_data:
-                for flight in flight_data:
-                    f.write(f"{origin} -- {destination} -- {flight['price']}\n")
-                print(f"Saved {len(flight_data)} flight prices to CSV")
-            else:
-                f.write(f"{origin} -- {destination} -- No direct flights found\n")
-
-        print(f"Direct flight CSV saved to {direct_flight_csv}")
-
-        # Return DataFrame
-        if flight_data:
-            return pd.DataFrame([{
-                'Airline': 'Various',
-                'Price': flight['price'],
-                'Departure': 'See screenshot',
-                'Arrival': 'See screenshot',
-                'Duration': 'See screenshot',
-                'Stops': 'Nonstop'
-            } for flight in flight_data])
-        else:
-            return pd.DataFrame([{
-                'Airline': 'See screenshot',
-                'Price': 'No prices found',
-                'Departure': 'See screenshot',
-                'Arrival': 'See screenshot',
-                'Duration': 'See screenshot',
-                'Stops': 'Nonstop'
-            }])
+        return flight_data
 
     except Exception as e:
-        print(f"Error in scrape_flight_data function: {e}")
-        return pd.DataFrame()
+        print(f"Error in scrape_flight_data_for_country function: {e}")
+        return []
 
     finally:
         driver.quit()
@@ -353,20 +370,83 @@ def main():
     depart_date = "2025-10-17"
     return_date = "2025-10-24"
 
-    print(f"Scraping flights from {origin} to {destination} on {depart_date} through {return_date}...")
+    # List of countries to test
+    countries = [
+        "Bosnia and Herzegovina",
+        "Croatia",
+        "Cyprus",
+        "Czech Republic",
+        "Denmark",
+        "Estonia"
+    ]
 
-    # Scrape flight data
-    flight_data = scrape_flight_data(origin, destination, depart_date, return_date)
+    # CSV file for all results
+    formatted_depart_date = depart_date.replace("-", "")
+    formatted_return_date = return_date.replace("-", "")
+    csv_file = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}_all_countries.csv"
 
-    # Print summary
-    if flight_data is not None and not flight_data.empty:
-        print("\nScraping completed successfully!")
-        print(f"Found {len(flight_data)} flight options")
-        print("\nPrice range:")
-        print(f"Min: {flight_data['Price'].min() if 'Price' in flight_data.columns else 'N/A'}")
-        print(f"Max: {flight_data['Price'].max() if 'Price' in flight_data.columns else 'N/A'}")
+    print(f"Starting multi-country flight price comparison...")
+    print(f"Route: {origin} to {destination}")
+    print(f"Dates: {depart_date} to {return_date}")
+    print(f"Countries: {', '.join(countries)}")
+
+    all_results = []
+
+    for country in countries:
+        print(f"\n{'='*50}")
+        print(f"Processing {country}")
+        print(f"{'='*50}")
+
+        # Connect to VPN
+        if connect_to_vpn(country):
+            current_ip = get_current_ip()
+            print(f"Current IP: {current_ip}")
+
+            # Scrape flight data
+            flight_data = scrape_flight_data_for_country(origin, destination, depart_date, return_date, country)
+
+            # Add country info to each flight
+            for flight in flight_data:
+                flight['country'] = country
+                flight['ip'] = current_ip
+                all_results.append(flight)
+
+            print(f"Found {len(flight_data)} flights for {country}")
+        else:
+            print(f"Failed to connect to VPN for {country}, skipping...")
+
+        # Small delay between countries
+        time.sleep(5)
+
+    # Disconnect VPN
+    disconnect_vpn()
+
+    # Save all results to CSV
+    if all_results:
+        with open(csv_file, 'w', newline='', encoding='utf-8') as f:
+            f.write("Origin,Destination,Price,Country,IP\n")
+            for result in all_results:
+                f.write(f"{origin},{destination},{result['price']},{result['country']},{result['ip']}\n")
+
+        print(f"\n{'='*50}")
+        print(f"SUMMARY")
+        print(f"{'='*50}")
+        print(f"Total flights found: {len(all_results)}")
+        print(f"Results saved to: {csv_file}")
+
+        # Print summary by country
+        country_summary = {}
+        for result in all_results:
+            country = result['country']
+            if country not in country_summary:
+                country_summary[country] = []
+            country_summary[country].append(result['price'])
+
+        for country, prices in country_summary.items():
+            print(f"{country}: {len(prices)} flights - {', '.join(prices)}")
+
     else:
-        print("\nNo flight data was found.")
+        print("No flight data collected from any country")
 
 
 if __name__ == "__main__":
