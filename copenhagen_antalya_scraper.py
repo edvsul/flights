@@ -468,7 +468,7 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
                 # If we still don't have a price, try extracting it from the element's text
                 if price == "N/A":
                     text = flight_element.text
-                    price_match = re.search(r"(DKK|€|kr|EUR|\$)\s*([0-9,]+)", text)
+                    price_match = re.search(r"(SEK|DKK|€|kr|EUR|\$)\s*([0-9,]+)", text)
                     if price_match:
                         price = f"{price_match.group(1)} {price_match.group(2)}"
 
@@ -564,11 +564,11 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
                 })
 
                 # Only save valid prices for true non-stop flights to CSV
-                if price != "N/A" and "DKK" in price and stops == "Nonstop":
+                if price != "N/A" and ("DKK" or "SEK") in price and stops == "Nonstop":
                     # Only append this price if it's actually a valid number
                     try:
                         # Extract the numeric part for validation
-                        numeric_price = price.replace("DKK", "").replace(",", "").strip()
+                        numeric_price = price.replace("DKK", "").replace("SEK", "").replace(",", "").strip()
                         if numeric_price and float(numeric_price) > 0:
                             # Append to the CSV instead of overwriting
                             with open(direct_flight_csv, 'a', newline='', encoding='utf-8') as f:
@@ -576,7 +576,7 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
                             print(f"Found verified non-stop flight with price: {price}")
                     except (ValueError, TypeError):
                         print(f"Skipping invalid price format: {price}")
-                elif price != "N/A" and "DKK" in price:
+                elif price != "N/A" and ("DKK" or "SEK") in price:
                     print(f"Skipping flight with price {price} - not a true non-stop flight (stops: {stops})")
                 else:
                     # Don't print for every N/A to reduce output spam
