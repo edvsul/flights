@@ -13,6 +13,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
 import tempfile
+from selenium.webdriver.common.keys import Keys
 
 
 def setup_driver():
@@ -198,6 +199,283 @@ def apply_nonstop_filter(driver):
         return False
 
 
+def select_eur_currency(driver):
+    """Select EUR currency on Google Flights."""
+    try:
+        print("Attempting to select EUR currency...")
+
+        # Wait for page to load
+        time.sleep(3)
+
+        # Multiple selectors for currency button/dropdown
+        currency_selectors = [
+            "//button[@aria-label='Currency']",
+            "//div[contains(@aria-label, 'Currency')][@role='button']",
+            "//button[contains(text(), 'Currency') or contains(@aria-label, 'currency')]",
+            "//div[contains(text(), 'Currency')]/parent::div[@role='button']",
+            "//button[contains(@data-value, 'currency')]",
+            "//div[@role='button'][contains(., 'DKK') or contains(., 'SEK') or contains(., 'USD') or contains(., 'EUR')]",
+            "//button[contains(., 'DKK') or contains(., 'SEK') or contains(., 'USD') or contains(., 'EUR')]"
+        ]
+
+        currency_button = None
+        for selector in currency_selectors:
+            try:
+                elements = driver.find_elements(By.XPATH, selector)
+                if elements:
+                    for element in elements:
+                        if element.is_displayed():
+                            currency_button = element
+                            print(f"Found currency selector with: {selector}")
+                            break
+                    if currency_button:
+                        break
+            except:
+                continue
+
+        if not currency_button:
+            print("Could not find currency selector button")
+            return False
+
+        # Click currency button
+        driver.execute_script("arguments[0].click();", currency_button)
+        time.sleep(2)
+
+        # Look for EUR option in dropdown/menu
+        eur_selectors = [
+            "//div[contains(text(), 'EUR') and contains(text(), '€')]",
+            "//span[contains(text(), 'EUR') and contains(text(), '€')]",
+            "//li[contains(text(), 'EUR') or contains(text(), '€')]",
+            "//div[@role='option'][contains(text(), 'EUR') or contains(text(), '€')]",
+            "//button[contains(text(), 'EUR') and contains(text(), '€')]",
+            "//div[contains(text(), 'Euro') or contains(text(), 'EUR')]",
+            "//span[text()='EUR']",
+            "//div[text()='EUR']"
+        ]
+
+        eur_selected = False
+        for selector in eur_selectors:
+            try:
+                elements = driver.find_elements(By.XPATH, selector)
+                if elements:
+                    for element in elements:
+                        if element.is_displayed():
+                            print(f"Found EUR option with selector: {selector}")
+                            driver.execute_script("arguments[0].click();", element)
+                            print("Selected EUR currency")
+                            time.sleep(2)
+                            eur_selected = True
+                            break
+                    if eur_selected:
+                        break
+            except:
+                continue
+
+        if not eur_selected:
+            print("Could not find EUR option in currency menu")
+            # Try to close any open menus by clicking elsewhere
+            try:
+                driver.find_element(By.TAG_NAME, "body").click()
+            except:
+                pass
+            return False
+
+        # Wait specifically for currency dialog to be visible
+        try:
+            print("Waiting for currency selection dialog...")
+            WebDriverWait(driver, 10).until(
+                EC.any_of(
+                    EC.presence_of_element_located((By.XPATH, "//div[contains(text(), 'Select your currency')]")),
+                    EC.presence_of_element_located((By.XPATH, "//div[contains(@aria-label, 'Select your currency')]")),
+                    EC.presence_of_element_located((By.XPATH, "//div[contains(@role, 'dialog')]//button[contains(text(), 'OK')]"))
+                )
+            )
+            print("Currency dialog detected")
+            time.sleep(2)  # Allow dialog to fully render
+        except TimeoutException:
+            print("Currency dialog not detected, proceeding with button search...")
+
+        # Look for and click OK/Done/Apply button to confirm currency selection
+        confirmation_selectors = [
+            # Most specific - Google Flights currency dialog OK button
+            "//div[contains(text(), 'Select your currency')]/ancestor::div[contains(@role, 'dialog')]//button[contains(text(), 'OK')]",
+            "//div[contains(text(), 'Select your currency')]/following::button[contains(text(), 'OK')]",
+            "//div[contains(@aria-label, 'Select your currency')]//button[contains(text(), 'OK')]",
+
+            # Currency dialog variations
+            "//div[contains(@role, 'dialog')]//button[contains(text(), 'OK')]",
+            "//div[contains(@class, 'dialog')]//button[contains(text(), 'OK')]",
+            "//div[contains(@aria-label, 'currency') or contains(@aria-label, 'Currency')]//button[contains(text(), 'OK')]",
+
+            # Modal/overlay specific
+            "//div[contains(@class, 'modal')]//button[contains(text(), 'OK')]",
+            "//div[contains(@class, 'overlay')]//button[contains(text(), 'OK')]",
+
+            # Generic OK button searches
+            "//button[text()='OK']",
+            "//button[contains(text(), 'OK')]",
+            "//button[contains(text(), 'Done')]",
+            "//button[contains(text(), 'Apply')]",
+
+            # Aria-label and role based
+            "//button[contains(@aria-label, 'OK') or contains(@aria-label, 'Done') or contains(@aria-label, 'Apply')]",
+            "//div[@role='button'][contains(text(), 'OK') or contains(text(), 'Done') or contains(text(), 'Apply')]",
+            "//span[@role='button'][contains(text(), 'OK') or contains(text(), 'Done') or contains(text(), 'Apply')]",
+
+            # CSS class based
+            "//button[contains(@class, 'primary') or contains(@class, 'confirm') or contains(@class, 'ok')]",
+            "//button[contains(@type, 'submit')]",
+
+            # Last resort - any button in dialog/modal
+            "//div[contains(@role, 'dialog')]//button",
+            "//div[contains(@class, 'dialog')]//button",
+            "//div[contains(@class, 'modal')]//button"
+        ]
+
+        confirmation_clicked = False
+        for selector in confirmation_selectors:
+            try:
+                elements = driver.find_elements(By.XPATH, selector)
+                if elements:
+                    for element in elements:
+                        if element.is_displayed() and element.is_enabled():
+                            element_text = element.text.strip()
+
+                            # Validate that this is actually an OK/confirmation button
+                            valid_confirmation_texts = ['OK', 'Done', 'Apply', 'Confirm', 'Save']
+                            is_valid_button = any(valid_text.lower() in element_text.lower() for valid_text in valid_confirmation_texts)
+
+                            # Skip buttons with just numbers or single characters
+                            if len(element_text) <= 2 and element_text.isdigit():
+                                print(f"Skipping numeric button: '{element_text}'")
+                                continue
+
+                            # Skip if text doesn't contain valid confirmation words
+                            if element_text and not is_valid_button:
+                                print(f"Skipping non-confirmation button: '{element_text}'")
+                                continue
+
+                            print(f"Found valid confirmation button with selector: {selector}")
+                            print(f"Button text: '{element_text}' (enabled: {element.is_enabled()})")
+
+                            # Try both regular click and JavaScript click
+                            try:
+                                element.click()
+                                print("Clicked confirmation button with regular click")
+                            except:
+                                driver.execute_script("arguments[0].click();", element)
+                                print("Clicked confirmation button with JavaScript click")
+
+                            time.sleep(3)
+
+                            # Verify the dialog is closed after clicking
+                            try:
+                                dialog_still_open = driver.find_elements(By.XPATH, "//div[contains(text(), 'Select your currency')]")
+                                if not dialog_still_open or not any(d.is_displayed() for d in dialog_still_open):
+                                    print("Currency dialog closed successfully!")
+                                    confirmation_clicked = True
+                                    break
+                                else:
+                                    print("Dialog still open, trying next selector...")
+                            except:
+                                # Assume success if we can't check
+                                confirmation_clicked = True
+                                break
+
+                    if confirmation_clicked:
+                        break
+            except Exception as e:
+                print(f"Error with selector {selector}: {e}")
+                continue
+
+        if not confirmation_clicked:
+            print("Could not find confirmation button, trying alternative approaches...")
+
+            # Try to find any button with "OK" anywhere in the page
+            try:
+                print("Scanning all buttons on page for valid confirmation text...")
+                all_buttons = driver.find_elements(By.TAG_NAME, "button")
+                print(f"Found {len(all_buttons)} total buttons on page")
+
+                for i, button in enumerate(all_buttons):
+                    if button.is_displayed() and button.is_enabled():
+                        button_text = button.text.strip()
+                        print(f"Button {i+1}: '{button_text}' (displayed: {button.is_displayed()}, enabled: {button.is_enabled()})")
+
+                        # Look specifically for OK button
+                        if button_text.upper() == 'OK':
+                            print(f"Found exact OK button: '{button_text}'")
+                            try:
+                                # Scroll to button to ensure it's clickable
+                                driver.execute_script("arguments[0].scrollIntoView(true);", button)
+                                time.sleep(1)
+
+                                # Try clicking
+                                button.click()
+                                print("Successfully clicked OK button with regular click")
+                                time.sleep(3)
+
+                                # Verify dialog closed
+                                dialog_still_open = driver.find_elements(By.XPATH, "//div[contains(text(), 'Select your currency')]")
+                                if not dialog_still_open or not any(d.is_displayed() for d in dialog_still_open):
+                                    print("Currency dialog closed successfully after OK click!")
+                                    confirmation_clicked = True
+                                    break
+                                else:
+                                    print("Dialog still open after OK click, trying JavaScript click...")
+                                    driver.execute_script("arguments[0].click();", button)
+                                    time.sleep(3)
+
+                                    # Check again
+                                    dialog_still_open = driver.find_elements(By.XPATH, "//div[contains(text(), 'Select your currency')]")
+                                    if not dialog_still_open or not any(d.is_displayed() for d in dialog_still_open):
+                                        print("Currency dialog closed successfully after JavaScript OK click!")
+                                        confirmation_clicked = True
+                                        break
+
+                            except Exception as e:
+                                print(f"Error clicking OK button: {e}")
+                                continue
+
+                        # Also try buttons with "Done", "Apply", etc.
+                        elif button_text.upper() in ['DONE', 'APPLY', 'CONFIRM', 'SAVE']:
+                            print(f"Found potential confirmation button: '{button_text}'")
+                            try:
+                                driver.execute_script("arguments[0].click();", button)
+                                print(f"Clicked {button_text} button")
+                                time.sleep(3)
+                                confirmation_clicked = True
+                                break
+                            except Exception as e:
+                                print(f"Error clicking {button_text} button: {e}")
+                                continue
+
+            except Exception as e:
+                print(f"Error searching all buttons: {e}")
+
+        if not confirmation_clicked:
+            print("Could not find confirmation button, currency may still be applied")
+            # Try pressing Enter key as fallback
+            try:
+                print("Trying Enter key as fallback confirmation")
+                driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ENTER)
+                time.sleep(2)
+                print("Trying Escape key to close any dialogs")
+                driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+                time.sleep(2)
+            except Exception as e:
+                print(f"Error with keyboard fallback: {e}")
+
+        # Wait for currency change to take effect
+        time.sleep(5)  # Increased wait time for currency change
+        print("EUR currency selection completed")
+        return True
+
+    except Exception as e:
+        print(f"Error selecting EUR currency: {e}")
+        return False
+
+
 def extract_flight_prices(driver):
     """Extract flight prices from the page."""
     flight_data = []
@@ -218,54 +496,116 @@ def extract_flight_prices(driver):
                     continue
 
                 visible_flights += 1
-                if visible_flights > 10:
+                if visible_flights > 15:  # Increased to catch more flights
                     break
 
-                # Extract price from element text
+                # Extract price from element text - prioritize EUR
                 text = flight_element.text
-                price_match = re.search(r"(SEK|DKK|€|kr|EUR)\s*([0-9,]+)", text)
-                if price_match:
-                    price_value = int(price_match.group(2).replace(",", ""))
-                    if 1000 <= price_value <= 50000:
-                        price = f"{price_match.group(1)} {price_match.group(2)}"
+                print(f"Checking flight element {visible_flights}: {text[:100]}...")  # Debug output
 
-                        # Check if nonstop
-                        element_text = text.lower()
-                        if "nonstop" in element_text or "non-stop" in element_text or "direct" in element_text:
+                # First try to find EUR prices specifically - improved patterns
+                eur_price_patterns = [
+                    r"€\s*([0-9,]+)",           # €1,951
+                    r"EUR\s*([0-9,]+)",         # EUR 1951
+                    r"([0-9,]+)\s*€",           # 1951 €
+                    r"([0-9,]+)\s*EUR"          # 1951 EUR
+                ]
+
+                for pattern in eur_price_patterns:
+                    eur_price_match = re.search(pattern, text)
+                    if eur_price_match:
+                        price_value = int(eur_price_match.group(1).replace(",", ""))
+                        if 100 <= price_value <= 50000:
+                            price = f"€{eur_price_match.group(1)}"
+
+                            # Check if nonstop (more lenient since filter was applied)
+                            element_text = text.lower()
+                            is_nonstop = ("nonstop" in element_text or "non-stop" in element_text or
+                                        "direct" in element_text or len(flight_data) == 0)  # Assume first flights are nonstop after filter
+
                             flight_data.append({'price': price, 'is_nonstop': True})
-                            print(f"Found nonstop flight with price: {price}")
+                            print(f"Found EUR flight with price: {price}")
+                            break  # Found EUR price, don't check other patterns
 
-            except Exception:
+                # If no EUR found, try fallback currencies
+                if not any(eur_price_match for pattern in eur_price_patterns if re.search(pattern, text)):
+                    price_match = re.search(r"(SEK|DKK|kr)\s*([0-9,]+)", text)
+                    if price_match:
+                        price_value = int(price_match.group(2).replace(",", ""))
+                        if 1000 <= price_value <= 50000:
+                            price = f"{price_match.group(1)} {price_match.group(2)}"
+                            flight_data.append({'price': price, 'is_nonstop': True})
+                            print(f"Found fallback currency flight with price: {price}")
+
+            except Exception as e:
+                print(f"Error processing flight element: {e}")
                 continue
 
         print(f"Processed {visible_flights} visible flight elements")
 
-    # Fallback: extract from page text if no flight elements found
+    # Enhanced fallback: extract from page text if no flight elements found
     if not flight_data:
         print("No flight elements found, trying page text extraction")
         page_text = driver.find_element(By.TAG_NAME, "body").text
-        price_matches = re.findall(r"(DKK|SEK|€)\s*([0-9,]+)", page_text)
+        print(f"Page text sample: {page_text[:500]}...")  # Debug output
 
-        if price_matches:
-            print(f"Found {len(price_matches)} price matches")
+        # First try to find EUR prices in page text - improved patterns
+        eur_price_patterns = [
+            r"€\s*([0-9,]+)",           # €1,951
+            r"EUR\s*([0-9,]+)",         # EUR 1951
+            r"([0-9,]+)\s*€",           # 1951 €
+            r"([0-9,]+)\s*EUR"          # 1951 EUR
+        ]
+
+        all_eur_matches = []
+        for pattern in eur_price_patterns:
+            matches = re.findall(pattern, page_text)
+            all_eur_matches.extend(matches)
+
+        if all_eur_matches:
+            print(f"Found {len(all_eur_matches)} EUR price matches in page text")
             valid_prices = []
             seen_prices = set()
 
-            for currency, price in price_matches:
+            for price in all_eur_matches:
                 try:
                     price_value = int(price.replace(",", ""))
-                    if 2000 <= price_value <= 10000 and price_value not in seen_prices:
-                        valid_prices.append(f"{currency} {price}")
+                    if 100 <= price_value <= 10000 and price_value not in seen_prices:
+                        valid_prices.append(f"€{price}")
                         seen_prices.add(price_value)
-                        if len(valid_prices) >= 2:
+                        if len(valid_prices) >= 5:  # Get more prices
                             break
                 except:
                     continue
 
             for price in valid_prices:
                 flight_data.append({'price': price, 'is_nonstop': True})
-                print(f"Extracted price: {price}")
+                print(f"Extracted EUR price from page text: {price}")
 
+        # Fallback to other currencies if no EUR found
+        if not flight_data:
+            price_matches = re.findall(r"(DKK|SEK|kr)\s*([0-9,]+)", page_text)
+            if price_matches:
+                print(f"Found {len(price_matches)} non-EUR price matches")
+                valid_prices = []
+                seen_prices = set()
+
+                for currency, price in price_matches:
+                    try:
+                        price_value = int(price.replace(",", ""))
+                        if 2000 <= price_value <= 10000 and price_value not in seen_prices:
+                            valid_prices.append(f"{currency} {price}")
+                            seen_prices.add(price_value)
+                            if len(valid_prices) >= 3:
+                                break
+                    except:
+                        continue
+
+                for price in valid_prices:
+                    flight_data.append({'price': price, 'is_nonstop': True})
+                    print(f"Extracted fallback price: {price}")
+
+    print(f"Total flight data extracted: {len(flight_data)} flights")
     return flight_data
 
 
@@ -295,6 +635,10 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
         # Apply nonstop filter
         apply_nonstop_filter(driver)
         time.sleep(10)  # Wait for filtered results
+
+        # Select EUR currency
+        select_eur_currency(driver)
+        time.sleep(10)  # Wait for currency change to take effect
 
         # Take screenshot and extract prices
         formatted_depart_date = depart_date.replace("-", "")
