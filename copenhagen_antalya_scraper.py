@@ -14,6 +14,7 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
 import tempfile
 from selenium.webdriver.common.keys import Keys
+import subprocess
 
 
 def setup_driver():
@@ -609,7 +610,119 @@ def extract_flight_prices(driver):
     return flight_data
 
 
-def scrape_flight_data(origin, destination, depart_date, return_date):
+def get_nordvpn_countries():
+    """Get list of available NordVPN countries."""
+    try:
+        print("Getting available NordVPN countries...")
+        result = subprocess.run(['nordvpn', 'countries'], capture_output=True, text=True, timeout=30)
+
+        if result.returncode == 0:
+            # Parse the output to extract country names
+            countries_text = result.stdout.strip()
+            print(f"NordVPN countries output: {countries_text[:200]}...")
+
+            # Split by lines and extract country names
+            # NordVPN typically outputs countries separated by commas or in a list format
+            countries = []
+
+            # Try different parsing approaches
+            if ',' in countries_text:
+                # Comma-separated format
+                countries = [country.strip() for country in countries_text.split(',') if country.strip()]
+            else:
+                # Line-separated format
+                lines = countries_text.split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if line and not line.startswith('-') and not line.startswith('Available'):
+                        # Split by whitespace and take country names
+                        parts = line.split()
+                        for part in parts:
+                            if len(part) > 2 and part.isalpha():
+                                countries.append(part)
+
+            # Remove duplicates and filter valid country names
+            unique_countries = []
+            seen = set()
+            for country in countries:
+                country_clean = country.strip().replace(',', '').replace('.', '')
+                if (len(country_clean) > 2 and
+                    country_clean.isalpha() and
+                    country_clean.lower() not in seen and
+                    country_clean.lower() not in ['available', 'countries', 'nordvpn']):
+                    unique_countries.append(country_clean)
+                    seen.add(country_clean.lower())
+
+            print(f"Found {len(unique_countries)} available countries: {unique_countries[:10]}...")
+            return unique_countries[:10]  # Limit to first 10 countries for testing
+
+        else:
+            print(f"Error getting NordVPN countries: {result.stderr}")
+            return []
+
+    except subprocess.TimeoutExpired:
+        print("Timeout getting NordVPN countries")
+        return []
+    except Exception as e:
+        print(f"Error getting NordVPN countries: {e}")
+        return []
+
+
+def connect_to_nordvpn_country(country):
+    """Connect to a specific NordVPN country."""
+    try:
+        print(f"Connecting to NordVPN country: {country}")
+        result = subprocess.run(['nordvpn', 'connect', country], capture_output=True, text=True, timeout=60)
+
+        if result.returncode == 0:
+            print(f"Successfully connected to {country}")
+            print(f"Connection output: {result.stdout.strip()}")
+
+            # Wait a bit for connection to stabilize
+            time.sleep(10)
+
+            # Verify connection
+            status_result = subprocess.run(['nordvpn', 'status'], capture_output=True, text=True, timeout=30)
+            if status_result.returncode == 0:
+                print(f"Connection status: {status_result.stdout.strip()}")
+
+            return True
+        else:
+            print(f"Failed to connect to {country}: {result.stderr}")
+            return False
+
+    except subprocess.TimeoutExpired:
+        print(f"Timeout connecting to {country}")
+        return False
+    except Exception as e:
+        print(f"Error connecting to {country}: {e}")
+        return False
+
+
+def disconnect_nordvpn():
+    """Disconnect from NordVPN."""
+    try:
+        print("Disconnecting from NordVPN...")
+        result = subprocess.run(['nordvpn', 'disconnect'], capture_output=True, text=True, timeout=30)
+
+        if result.returncode == 0:
+            print("Successfully disconnected from NordVPN")
+            print(f"Disconnect output: {result.stdout.strip()}")
+            time.sleep(5)  # Wait for disconnection to complete
+            return True
+        else:
+            print(f"Error disconnecting from NordVPN: {result.stderr}")
+            return False
+
+    except subprocess.TimeoutExpired:
+        print("Timeout disconnecting from NordVPN")
+        return False
+    except Exception as e:
+        print(f"Error disconnecting from NordVPN: {e}")
+        return False
+
+
+def scrape_flight_data(origin, destination, depart_date, return_date, country=None):
     """Scrape flight data from Google Flights."""
     driver = setup_driver()
 
@@ -643,28 +756,32 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
         # Take screenshot and extract prices
         formatted_depart_date = depart_date.replace("-", "")
         formatted_return_date = return_date.replace("-", "")
-        screenshot_file = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}.png"
-        direct_flight_csv = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}_direct.csv"
+        country_suffix = f"_{country}" if country else ""
+        screenshot_file = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}{country_suffix}.png"
 
         driver.save_screenshot(screenshot_file)
         print(f"Screenshot saved to {screenshot_file}")
 
         flight_data = extract_flight_prices(driver)
 
-        # Save to CSV
+        # Save to CSV with country information
+        country_suffix = f"_{country}" if country else ""
+        direct_flight_csv = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}_direct{country_suffix}.csv"
+        
         with open(direct_flight_csv, 'w', newline='') as f:
             if flight_data:
                 for flight in flight_data:
-                    f.write(f"{origin} -- {destination} -- {flight['price']}\n")
-                print(f"Saved {len(flight_data)} flight prices to CSV")
+                    f.write(f"{origin} -- {destination} -- {flight['price']} -- {country or 'Unknown'}\n")
+                print(f"Saved {len(flight_data)} flight prices to CSV for {country or 'Unknown'}")
             else:
-                f.write(f"{origin} -- {destination} -- No direct flights found\n")
+                f.write(f"{origin} -- {destination} -- No direct flights found -- {country or 'Unknown'}\n")
 
         print(f"Direct flight CSV saved to {direct_flight_csv}")
 
-        # Return DataFrame
+        # Return DataFrame with country information
         if flight_data:
             return pd.DataFrame([{
+                'Country': country or 'Unknown',
                 'Airline': 'Various',
                 'Price': flight['price'],
                 'Departure': 'See screenshot',
@@ -674,6 +791,7 @@ def scrape_flight_data(origin, destination, depart_date, return_date):
             } for flight in flight_data])
         else:
             return pd.DataFrame([{
+                'Country': country or 'Unknown',
                 'Airline': 'See screenshot',
                 'Price': 'No prices found',
                 'Departure': 'See screenshot',
@@ -699,18 +817,93 @@ def main():
 
     print(f"Scraping flights from {origin} to {destination} on {depart_date} through {return_date}...")
 
-    # Scrape flight data
-    flight_data = scrape_flight_data(origin, destination, depart_date, return_date)
-
-    # Print summary
-    if flight_data is not None and not flight_data.empty:
-        print("\nScraping completed successfully!")
-        print(f"Found {len(flight_data)} flight options")
-        print("\nPrice range:")
-        print(f"Min: {flight_data['Price'].min() if 'Price' in flight_data.columns else 'N/A'}")
-        print(f"Max: {flight_data['Price'].max() if 'Price' in flight_data.columns else 'N/A'}")
+    # Get available NordVPN countries
+    countries = get_nordvpn_countries()
+    if not countries:
+        print("No NordVPN countries available, running without VPN...")
+        countries = [None]  # Run once without VPN
     else:
-        print("\nNo flight data was found.")
+        print(f"Found {len(countries)} NordVPN countries to test: {countries}")
+
+    all_flight_data = []
+    successful_countries = []
+    failed_countries = []
+
+    # Disconnect from any existing VPN connection
+    disconnect_nordvpn()
+
+    for i, country in enumerate(countries, 1):
+        print(f"\n{'='*60}")
+        print(f"Processing country {i}/{len(countries)}: {country or 'No VPN'}")
+        print(f"{'='*60}")
+
+        # Connect to VPN if country is specified
+        if country:
+            print(f"Connecting to {country}...")
+            if not connect_to_nordvpn_country(country):
+                print(f"Failed to connect to {country}, skipping...")
+                failed_countries.append(country)
+                continue
+            print(f"Successfully connected to {country}, proceeding with scraping...")
+
+        try:
+            # Scrape flight data for this country
+            flight_data = scrape_flight_data(origin, destination, depart_date, return_date, country)
+
+            if flight_data is not None and not flight_data.empty:
+                all_flight_data.append(flight_data)
+                successful_countries.append(country or 'No VPN')
+                print(f"Successfully scraped data for {country or 'No VPN'}: {len(flight_data)} flights found")
+            else:
+                print(f"No flight data found for {country or 'No VPN'}")
+                failed_countries.append(country or 'No VPN')
+
+        except Exception as e:
+            print(f"Error scraping data for {country or 'No VPN'}: {e}")
+            failed_countries.append(country or 'No VPN')
+
+        # Add a small delay between countries for stability
+        if i < len(countries):
+            time.sleep(3)  # Brief pause between countries
+
+    # Final VPN disconnect
+    if countries and countries[0] is not None:
+        disconnect_nordvpn()
+
+    # Combine all data and create consolidated report
+    if all_flight_data:
+        combined_data = pd.concat(all_flight_data, ignore_index=True)
+        
+        # Save consolidated CSV
+        consolidated_csv = f"{origin}_to_{destination}_consolidated_prices.csv"
+        combined_data.to_csv(consolidated_csv, index=False)
+        print(f"\nConsolidated data saved to {consolidated_csv}")
+
+        # Print summary by country
+        print("\n" + "="*80)
+        print("FLIGHT PRICE SUMMARY BY COUNTRY")
+        print("="*80)
+        
+        for country_name in combined_data['Country'].unique():
+            country_data = combined_data[combined_data['Country'] == country_name]
+            prices = country_data['Price'].tolist()
+            valid_prices = [p for p in prices if p != 'No prices found']
+            
+            print(f"\n{country_name}:")
+            print(f"  Flights found: {len(country_data)}")
+            if valid_prices:
+                print(f"  Prices: {', '.join(valid_prices)}")
+            else:
+                print(f"  Prices: No valid prices found")
+
+        print(f"\n\nSUMMARY:")
+        print(f"Successful countries: {len(successful_countries)} - {successful_countries}")
+        print(f"Failed countries: {len(failed_countries)} - {failed_countries}")
+        print(f"Total flights found: {len(combined_data)}")
+        
+    else:
+        print("\nNo flight data was collected from any country.")
+        print(f"Failed countries: {failed_countries}")
 
 
 if __name__ == "__main__":
