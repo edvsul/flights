@@ -203,7 +203,7 @@ def apply_nonstop_filter(driver):
 def select_eur_currency(driver):
     """Select EUR currency on Google Flights with multiple attempts and verification."""
     max_attempts = 3
-    
+
     for attempt in range(max_attempts):
         try:
             print(f"Attempting to select EUR currency (attempt {attempt + 1}/{max_attempts})...")
@@ -330,14 +330,14 @@ def select_eur_currency(driver):
                             if element.is_displayed() and element.is_enabled():
                                 element_text = element.text.strip()
                                 print(f"Found confirmation button: '{element_text}'")
-                                
+
                                 try:
                                     element.click()
                                     print(f"Clicked confirmation button: '{element_text}'")
                                 except:
                                     driver.execute_script("arguments[0].click();", element)
                                     print(f"Clicked confirmation button with JS: '{element_text}'")
-                                
+
                                 time.sleep(3)
                                 confirmation_clicked = True
                                 break
@@ -356,7 +356,7 @@ def select_eur_currency(driver):
 
             # Wait for currency change to take effect and verify
             time.sleep(8)
-            
+
             # Verify EUR selection worked
             updated_page_text = driver.find_element(By.TAG_NAME, "body").text
             if "€" in updated_page_text:
@@ -554,7 +554,7 @@ def get_nordvpn_countries():
                     seen.add(country_clean.lower())
 
             print(f"Found {len(unique_countries)} available countries: {unique_countries[:10]}...")
-            return unique_countries[:10]  # Limit to first 10 countries for testing
+            return unique_countries  # Process all available countries
 
         else:
             print(f"Error getting NordVPN countries: {result.stderr}")
@@ -629,22 +629,22 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
     try:
         # Try multiple URL approaches to force EUR currency
         base_url = f"https://www.google.com/travel/flights?q=Flights%20to%20{destination}%20from%20{origin}%20on%20{depart_date}%20through%20{return_date}"
-        
+
         # Try different EUR parameter variations
         eur_urls = [
             f"{base_url}&curr=EUR",
-            f"{base_url}&currency=EUR", 
+            f"{base_url}&currency=EUR",
             f"{base_url}&hl=en&gl=DE&curr=EUR",  # German locale with EUR
             f"https://www.google.com/travel/flights?hl=en&gl=DE&curr=EUR&q=Flights%20to%20{destination}%20from%20{origin}%20on%20{depart_date}%20through%20{return_date}"
         ]
-        
+
         success = False
         for i, url in enumerate(eur_urls):
             try:
                 print(f"Trying URL approach {i+1}: {url}")
                 driver.get(url)
                 time.sleep(5)
-                
+
                 # Quick check if EUR symbols appear
                 page_text = driver.find_element(By.TAG_NAME, "body").text
                 if "€" in page_text:
@@ -653,11 +653,11 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
                     break
                 else:
                     print(f"No EUR symbols found with URL approach {i+1}")
-                    
+
             except Exception as e:
                 print(f"Error with URL approach {i+1}: {e}")
                 continue
-        
+
         if not success:
             print("All URL approaches failed, using base URL")
             driver.get(base_url)
@@ -698,7 +698,7 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
         # Save to CSV with country information
         country_suffix = f"_{country}" if country else ""
         direct_flight_csv = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}_direct{country_suffix}.csv"
-        
+
         with open(direct_flight_csv, 'w', newline='') as f:
             if flight_data:
                 for flight in flight_data:
@@ -804,7 +804,7 @@ def main():
     # Combine all data and create consolidated report
     if all_flight_data:
         combined_data = pd.concat(all_flight_data, ignore_index=True)
-        
+
         # Save consolidated CSV
         consolidated_csv = f"{origin}_to_{destination}_consolidated_prices.csv"
         combined_data.to_csv(consolidated_csv, index=False)
@@ -814,12 +814,12 @@ def main():
         print("\n" + "="*80)
         print("FLIGHT PRICE SUMMARY BY COUNTRY")
         print("="*80)
-        
+
         for country_name in combined_data['Country'].unique():
             country_data = combined_data[combined_data['Country'] == country_name]
             prices = country_data['Price'].tolist()
             valid_prices = [p for p in prices if p != 'No prices found']
-            
+
             print(f"\n{country_name}:")
             print(f"  Flights found: {len(country_data)}")
             if valid_prices:
@@ -831,7 +831,7 @@ def main():
         print(f"Successful countries: {len(successful_countries)} - {successful_countries}")
         print(f"Failed countries: {len(failed_countries)} - {failed_countries}")
         print(f"Total flights found: {len(combined_data)}")
-        
+
     else:
         print("\nNo flight data was collected from any country.")
         print(f"Failed countries: {failed_countries}")
