@@ -485,7 +485,7 @@ def extract_flight_prices(driver):
 
         # Fallback to other currencies if no EUR found
         if not flight_data:
-            price_matches = re.findall(r"(DKK|SEK|kr)\s*([0-9,]+)", page_text)
+            price_matches = re.findall(r"(DKK|SEK|kr|£)\s*([0-9,]+)", page_text)
             if price_matches:
                 print(f"Found {len(price_matches)} non-EUR price matches")
                 valid_prices = []
