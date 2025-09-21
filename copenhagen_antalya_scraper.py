@@ -33,8 +33,10 @@ def setup_driver():
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--window-size=1920,1080")
 
-    # Create unique temporary directory for each browser instance
-    temp_dir = tempfile.mkdtemp(prefix="chrome_session_")
+    # Create unique temporary directory for each browser instance with timestamp and UUID
+    unique_id = str(uuid.uuid4())[:8]
+    timestamp = str(int(time.time()))
+    temp_dir = tempfile.mkdtemp(prefix=f"chrome_session_{timestamp}_{unique_id}_")
     chrome_options.add_argument(f"--user-data-dir={temp_dir}")
 
     # Ensure completely clean session - no cache, cookies, or stored data
@@ -97,6 +99,9 @@ def setup_driver():
     driver.execute_script("delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol")
 
     print(f"Created clean browser session with temp directory: {temp_dir}")
+
+    # Store temp_dir in driver for cleanup later
+    driver.temp_dir = temp_dir
     return driver
 
 
@@ -835,7 +840,7 @@ def get_nordvpn_countries():
                     seen.add(country_clean.lower())
 
             print(f"Found {len(unique_countries)} available countries: {unique_countries[:10]}...")
-            return unique_countries
+            return unique_countries[:3]
 
         else:
             print(f"Error getting NordVPN countries: {result.stderr}")
@@ -1008,10 +1013,43 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
         return pd.DataFrame()
 
     finally:
-        driver.quit()
+        # Proper cleanup with temp directory removal
+        temp_dir = getattr(driver, 'temp_dir', None)
+        try:
+            driver.quit()
+        except:
+            pass
+
+        # Clean up temporary directory
+        if temp_dir and os.path.exists(temp_dir):
+            try:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                print(f"Cleaned up temp directory: {temp_dir}")
+            except Exception as e:
+                print(f"Warning: Could not clean up temp directory {temp_dir}: {e}")
+
+
+def cleanup_old_temp_dirs():
+    """Clean up any leftover Chrome temp directories from previous runs."""
+    try:
+        temp_base = tempfile.gettempdir()
+        for item in os.listdir(temp_base):
+            if item.startswith("chrome_session_"):
+                temp_path = os.path.join(temp_base, item)
+                if os.path.isdir(temp_path):
+                    try:
+                        shutil.rmtree(temp_path, ignore_errors=True)
+                        print(f"Cleaned up leftover temp directory: {temp_path}")
+                    except:
+                        pass
+    except Exception as e:
+        print(f"Warning: Could not clean up old temp directories: {e}")
 
 
 def main():
+    # Clean up any leftover temp directories first
+    cleanup_old_temp_dirs()
+
     # Define flight search parameters
     origin = "Copenhagen"
     destination = "Antalya"
