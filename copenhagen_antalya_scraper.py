@@ -18,6 +18,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 import tempfile
 from selenium.webdriver.common.keys import Keys
 import subprocess
+import boto3 as b
 
 
 def setup_driver():
@@ -844,7 +845,7 @@ def get_nordvpn_countries():
                     seen.add(country_clean.lower())
 
             print(f"Found {len(unique_countries)} available countries: {unique_countries[:10]}...")
-            return unique_countries
+            return unique_countries[:1]
 
         else:
             print(f"Error getting NordVPN countries: {result.stderr}")
@@ -982,6 +983,16 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
         # Ensure screenshots directory exists
         os.makedirs("screenshots", exist_ok=True)
         screenshot_file = f"screenshots/{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}{country_suffix}.png"
+
+        BUCKET = 'countries-flights-screenshots'
+        try:
+            client = b.client(service_name="s3",region_name="eu-north-1")
+            key = f"screenshots/{os.path.basename(screenshot_file)}"
+            client.upload_file(screenshot_file, BUCKET, key)
+            print(f"Screenshot uploaded to S3: s3://{BUCKET}/{screenshot_file}")
+        except Exception as e:
+            print(f"Error creating S3 client: {e}")
+            return pd.DataFrame()
 
         driver.save_screenshot(screenshot_file)
         print(f"Screenshot saved to {screenshot_file}")
