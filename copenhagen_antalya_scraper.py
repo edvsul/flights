@@ -3,6 +3,8 @@ import os
 import time
 import re
 import random
+import shutil
+import uuid
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -33,10 +35,12 @@ def setup_driver():
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--window-size=1920,1080")
 
-    # Create unique temporary directory for each browser instance with timestamp and UUID
+    # Create unique temporary directory in current working directory
     unique_id = str(uuid.uuid4())[:8]
     timestamp = str(int(time.time()))
-    temp_dir = tempfile.mkdtemp(prefix=f"chrome_session_{timestamp}_{unique_id}_")
+    temp_dir_name = f"chrome_session_{timestamp}_{unique_id}"
+    temp_dir = os.path.join(os.getcwd(), "temp_chrome_sessions", temp_dir_name)
+    os.makedirs(temp_dir, exist_ok=True)
     chrome_options.add_argument(f"--user-data-dir={temp_dir}")
 
     # Ensure completely clean session - no cache, cookies, or stored data
@@ -1032,16 +1036,24 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
 def cleanup_old_temp_dirs():
     """Clean up any leftover Chrome temp directories from previous runs."""
     try:
-        temp_base = tempfile.gettempdir()
-        for item in os.listdir(temp_base):
-            if item.startswith("chrome_session_"):
-                temp_path = os.path.join(temp_base, item)
-                if os.path.isdir(temp_path):
-                    try:
-                        shutil.rmtree(temp_path, ignore_errors=True)
-                        print(f"Cleaned up leftover temp directory: {temp_path}")
-                    except:
-                        pass
+        temp_base = os.path.join(os.getcwd(), "temp_chrome_sessions")
+        if os.path.exists(temp_base):
+            for item in os.listdir(temp_base):
+                if item.startswith("chrome_session_"):
+                    temp_path = os.path.join(temp_base, item)
+                    if os.path.isdir(temp_path):
+                        try:
+                            shutil.rmtree(temp_path, ignore_errors=True)
+                            print(f"Cleaned up leftover temp directory: {temp_path}")
+                        except:
+                            pass
+            # Remove the temp_chrome_sessions directory if it's empty
+            try:
+                if not os.listdir(temp_base):
+                    os.rmdir(temp_base)
+                    print("Removed empty temp_chrome_sessions directory")
+            except:
+                pass
     except Exception as e:
         print(f"Warning: Could not clean up old temp directories: {e}")
 
