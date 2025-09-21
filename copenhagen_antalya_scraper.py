@@ -835,7 +835,7 @@ def get_nordvpn_countries():
                     seen.add(country_clean.lower())
 
             print(f"Found {len(unique_countries)} available countries: {unique_countries[:10]}...")
-            return unique_countries
+            return unique_countries[:3]
 
         else:
             print(f"Error getting NordVPN countries: {result.stderr}")
@@ -969,26 +969,17 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
         formatted_depart_date = depart_date.replace("-", "")
         formatted_return_date = return_date.replace("-", "")
         country_suffix = f"_{country}" if country else ""
-        screenshot_file = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}{country_suffix}.png"
+
+        # Ensure screenshots directory exists
+        os.makedirs("screenshots", exist_ok=True)
+        screenshot_file = f"screenshots/{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}{country_suffix}.png"
 
         driver.save_screenshot(screenshot_file)
         print(f"Screenshot saved to {screenshot_file}")
 
         flight_data = extract_flight_prices(driver)
 
-        # Save to CSV with country information
-        country_suffix = f"_{country}" if country else ""
-        direct_flight_csv = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}_direct{country_suffix}.csv"
-
-        with open(direct_flight_csv, 'w', newline='') as f:
-            if flight_data:
-                for flight in flight_data:
-                    f.write(f"{origin} -- {destination} -- {flight['price']} -- {country or 'Unknown'}\n")
-                print(f"Saved {len(flight_data)} flight prices to CSV for {country or 'Unknown'}")
-            else:
-                f.write(f"{origin} -- {destination} -- No direct flights found -- {country or 'Unknown'}\n")
-
-        print(f"Direct flight CSV saved to {direct_flight_csv}")
+        # Flight data extracted, will be saved to CSV by main function
 
         # Return DataFrame with country information
         if flight_data:
@@ -1067,6 +1058,13 @@ def main():
                 all_flight_data.append(flight_data)
                 successful_countries.append(country or 'No VPN')
                 print(f"Successfully scraped data for {country or 'No VPN'}: {len(flight_data)} flights found")
+
+                # Save individual country CSV file
+                os.makedirs("prices", exist_ok=True)
+                country_suffix = f"_{country}" if country else "_NoVPN"
+                individual_csv = f"prices/{origin}_to_{destination}_direct{country_suffix}.csv"
+                flight_data.to_csv(individual_csv, index=False)
+                print(f"Individual country data saved to {individual_csv}")
             else:
                 print(f"No flight data found for {country or 'No VPN'}")
                 failed_countries.append(country or 'No VPN')
@@ -1088,7 +1086,8 @@ def main():
         combined_data = pd.concat(all_flight_data, ignore_index=True)
 
         # Save consolidated CSV
-        consolidated_csv = f"{origin}_to_{destination}_consolidated_prices.csv"
+        os.makedirs("prices", exist_ok=True)
+        consolidated_csv = f"prices/{origin}_to_{destination}_consolidated_prices.csv"
         combined_data.to_csv(consolidated_csv, index=False)
         print(f"\nConsolidated data saved to {consolidated_csv}")
 
