@@ -2,6 +2,7 @@
 import os
 import time
 import re
+import random
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -18,7 +19,7 @@ import subprocess
 
 
 def setup_driver():
-    """Set up and return a configured Chrome WebDriver."""
+    """Set up and return a configured Chrome WebDriver with clean session."""
     chrome_options = Options()
 
     # Essential options for headless operation
@@ -32,31 +33,70 @@ def setup_driver():
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--window-size=1920,1080")
 
-    # Add unique user data directory
-    temp_dir = tempfile.mkdtemp()
+    # Create unique temporary directory for each browser instance
+    temp_dir = tempfile.mkdtemp(prefix="chrome_session_")
     chrome_options.add_argument(f"--user-data-dir={temp_dir}")
-
-    # Additional stability options
+    
+    # Ensure completely clean session - no cache, cookies, or stored data
+    chrome_options.add_argument("--incognito")  # Private browsing mode
+    chrome_options.add_argument("--disable-web-security")
+    chrome_options.add_argument("--disable-features=VizDisplayCompositor")
+    chrome_options.add_argument("--disable-application-cache")
+    chrome_options.add_argument("--disable-background-networking")
+    chrome_options.add_argument("--disable-sync")
+    chrome_options.add_argument("--disable-translate")
+    chrome_options.add_argument("--hide-scrollbars")
+    chrome_options.add_argument("--metrics-recording-only")
+    chrome_options.add_argument("--mute-audio")
+    chrome_options.add_argument("--no-default-browser-check")
+    chrome_options.add_argument("--no-first-run")
+    chrome_options.add_argument("--safebrowsing-disable-auto-update")
+    chrome_options.add_argument("--disable-default-apps")
+    chrome_options.add_argument("--disable-domain-reliability")
+    
+    # Clear any existing data
+    chrome_options.add_argument("--aggressive-cache-discard")
     chrome_options.add_argument("--disable-background-timer-throttling")
     chrome_options.add_argument("--disable-backgrounding-occluded-windows")
     chrome_options.add_argument("--disable-renderer-backgrounding")
     chrome_options.add_argument("--disable-features=TranslateUI")
     chrome_options.add_argument("--disable-ipc-flooding-protection")
 
-    # User agent
-    chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    # User agent - randomize slightly for each session
+    chrome_versions = ["120.0.0.0", "119.0.0.0", "121.0.0.0"]
+    chrome_version = random.choice(chrome_versions)
+    chrome_options.add_argument(f"--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version} Safari/537.36")
 
     # Exclude automation flags
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option("useAutomationExtension", False)
+    
+    # Additional prefs for clean session
+    prefs = {
+        "profile.default_content_setting_values": {
+            "notifications": 2,
+            "geolocation": 2,
+        },
+        "profile.managed_default_content_settings": {
+            "images": 1
+        },
+        "profile.default_content_settings": {
+            "popups": 0
+        }
+    }
+    chrome_options.add_experimental_option("prefs", prefs)
 
     # Create WebDriver
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=chrome_options)
 
-    # Remove webdriver property
+    # Remove webdriver property and other automation indicators
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-
+    driver.execute_script("delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array")
+    driver.execute_script("delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise")
+    driver.execute_script("delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol")
+    
+    print(f"Created clean browser session with temp directory: {temp_dir}")
     return driver
 
 
@@ -1019,7 +1059,8 @@ def main():
             print(f"Successfully connected to {country}, proceeding with scraping...")
 
         try:
-            # Scrape flight data for this country
+            # Scrape flight data for this country with clean browser
+            print(f"Creating clean browser session for {country or 'No VPN'}...")
             flight_data = scrape_flight_data(origin, destination, depart_date, return_date, country)
 
             if flight_data is not None and not flight_data.empty:
