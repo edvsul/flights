@@ -36,7 +36,7 @@ def setup_driver():
     # Create unique temporary directory for each browser instance
     temp_dir = tempfile.mkdtemp(prefix="chrome_session_")
     chrome_options.add_argument(f"--user-data-dir={temp_dir}")
-    
+
     # Ensure completely clean session - no cache, cookies, or stored data
     chrome_options.add_argument("--incognito")  # Private browsing mode
     chrome_options.add_argument("--disable-web-security")
@@ -53,7 +53,7 @@ def setup_driver():
     chrome_options.add_argument("--safebrowsing-disable-auto-update")
     chrome_options.add_argument("--disable-default-apps")
     chrome_options.add_argument("--disable-domain-reliability")
-    
+
     # Clear any existing data
     chrome_options.add_argument("--aggressive-cache-discard")
     chrome_options.add_argument("--disable-background-timer-throttling")
@@ -70,7 +70,7 @@ def setup_driver():
     # Exclude automation flags
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option("useAutomationExtension", False)
-    
+
     # Additional prefs for clean session
     prefs = {
         "profile.default_content_setting_values": {
@@ -95,7 +95,7 @@ def setup_driver():
     driver.execute_script("delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array")
     driver.execute_script("delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise")
     driver.execute_script("delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol")
-    
+
     print(f"Created clean browser session with temp directory: {temp_dir}")
     return driver
 
@@ -835,7 +835,7 @@ def get_nordvpn_countries():
                     seen.add(country_clean.lower())
 
             print(f"Found {len(unique_countries)} available countries: {unique_countries[:10]}...")
-            return unique_countries[:3]
+            return unique_countries
 
         else:
             print(f"Error getting NordVPN countries: {result.stderr}")
