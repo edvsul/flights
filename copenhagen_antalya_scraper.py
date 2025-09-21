@@ -449,7 +449,7 @@ def extract_flight_prices(driver):
                         (r"₱\s*([0-9,]+)", "PHP", 3000, 600000),    # Philippine Peso
                         (r"₫\s*([0-9,]+)", "VND", 1000000, 250000000), # Vietnamese Dong
                         (r"₯\s*([0-9,]+)", "GRD", 200, 35000),      # Greek Drachma (legacy)
-                        
+
                         # Currency codes with amounts
                         (r"(USD|US\$)\s*([0-9,]+)", "USD", 50, 10000),
                         (r"(GBP|GB£)\s*([0-9,]+)", "GBP", 50, 8000),
@@ -505,7 +505,7 @@ def extract_flight_prices(driver):
                         (r"(JPY)\s*([0-9,]+)", "JPY", 5000, 1000000),
                         (r"(KRW)\s*([0-9,]+)", "KRW", 100000, 15000000),
                         (r"(MNT)\s*([0-9,]+)", "MNT", 150000, 27000000),
-                        
+
                         # African currencies
                         (r"(ZAR)\s*([0-9,]+)", "ZAR", 1000, 180000),
                         (r"(EGP)\s*([0-9,]+)", "EGP", 1500, 270000),
@@ -518,7 +518,7 @@ def extract_flight_prices(driver):
                         (r"(AOA)\s*([0-9,]+)", "AOA", 30000, 5500000),
                         (r"(XAF)\s*([0-9,]+)", "XAF", 35000, 6500000),  # Central African CFA
                         (r"(XOF)\s*([0-9,]+)", "XOF", 35000, 6500000),  # West African CFA
-                        
+
                         # Middle Eastern currencies
                         (r"(SAR)\s*([0-9,]+)", "SAR", 200, 38000),
                         (r"(AED)\s*([0-9,]+)", "AED", 200, 37000),
@@ -531,7 +531,7 @@ def extract_flight_prices(driver):
                         (r"(SYP)\s*([0-9,]+)", "SYP", 150000, 25000000),
                         (r"(IQD)\s*([0-9,]+)", "IQD", 80000, 13000000),
                         (r"(IRR)\s*([0-9,]+)", "IRR", 2500000, 420000000),
-                        
+
                         # Latin American currencies
                         (r"(MXN)\s*([0-9,]+)", "MXN", 1200, 200000),
                         (r"(BRL)\s*([0-9,]+)", "BRL", 300, 55000),
@@ -557,12 +557,12 @@ def extract_flight_prices(driver):
                         (r"(DOP)\s*([0-9,]+)", "DOP", 3500, 600000),
                         (r"(HTG)\s*([0-9,]+)", "HTG", 8000, 1400000),
                         (r"(CUP)\s*([0-9,]+)", "CUP", 150, 25000),
-                        
+
                         # Generic patterns for kr (Nordic countries)
                         (r"([0-9,]+)\s*kr", "kr", 500, 100000),
                         (r"kr\s*([0-9,]+)", "kr", 500, 100000),
                     ]
-                    
+
                     for pattern, currency_code, min_val, max_val in local_currency_patterns:
                         price_match = re.search(pattern, text, re.IGNORECASE)
                         if price_match:
@@ -571,7 +571,7 @@ def extract_flight_prices(driver):
                                 price_value_str = price_match.group(1)
                             else:
                                 price_value_str = price_match.group(2)
-                            
+
                             try:
                                 price_value = int(price_value_str.replace(",", ""))
                                 if min_val <= price_value <= max_val:
@@ -630,7 +630,7 @@ def extract_flight_prices(driver):
         # Fallback to local currencies if no EUR found
         if not flight_data:
             print("Trying comprehensive currency extraction from page text...")
-            
+
             # Use the same comprehensive currency patterns as above
             local_currency_patterns = [
                 # Major currencies with symbols
@@ -648,7 +648,7 @@ def extract_flight_prices(driver):
                 (r"₨\s*([0-9,]+)", "PKR", 15000, 3000000),
                 (r"₱\s*([0-9,]+)", "PHP", 3000, 600000),
                 (r"₫\s*([0-9,]+)", "VND", 1000000, 250000000),
-                
+
                 # Currency codes - most common ones first
                 (r"(AFN)\s*([0-9,]+)", "AFN", 5000, 900000),
                 (r"(AUD|A\$)\s*([0-9,]+)", "AUD", 80, 15000),
@@ -676,7 +676,7 @@ def extract_flight_prices(driver):
                 (r"(USD|US\$)\s*([0-9,]+)", "USD", 50, 10000),
                 (r"(VND)\s*([0-9,]+)", "VND", 1000000, 250000000),
                 (r"(ZAR)\s*([0-9,]+)", "ZAR", 1000, 180000),
-                
+
                 # Middle Eastern & African
                 (r"(AED)\s*([0-9,]+)", "AED", 200, 37000),
                 (r"(EGP)\s*([0-9,]+)", "EGP", 1500, 270000),
@@ -689,7 +689,7 @@ def extract_flight_prices(driver):
                 (r"(QAR)\s*([0-9,]+)", "QAR", 200, 37000),
                 (r"(SAR)\s*([0-9,]+)", "SAR", 200, 38000),
                 (r"(TND)\s*([0-9,]+)", "TND", 200, 35000),
-                
+
                 # Latin American
                 (r"(ARS)\s*([0-9,]+)", "ARS", 60000, 10000000),
                 (r"(BRL)\s*([0-9,]+)", "BRL", 300, 55000),
@@ -697,7 +697,7 @@ def extract_flight_prices(driver):
                 (r"(COP)\s*([0-9,]+)", "COP", 250000, 45000000),
                 (r"(MXN)\s*([0-9,]+)", "MXN", 1200, 200000),
                 (r"(PEN)\s*([0-9,]+)", "PEN", 200, 37000),
-                
+
                 # Eastern European
                 (r"(BGN)\s*([0-9,]+)", "BGN", 100, 18000),
                 (r"(CZK)\s*([0-9,]+)", "CZK", 1500, 250000),
@@ -705,24 +705,24 @@ def extract_flight_prices(driver):
                 (r"(HUF)\s*([0-9,]+)", "HUF", 20000, 3500000),
                 (r"(RON)\s*([0-9,]+)", "RON", 250, 45000),
                 (r"(UAH)\s*([0-9,]+)", "UAH", 2000, 400000),
-                
+
                 # Central Asian
                 (r"(KZT)\s*([0-9,]+)", "KZT", 25000, 4500000),
                 (r"(UZS)\s*([0-9,]+)", "UZS", 600000, 110000000),
-                
+
                 # Generic kr pattern (Nordic countries)
                 (r"([0-9,]+)\s*kr", "kr", 500, 100000),
                 (r"kr\s*([0-9,]+)", "kr", 500, 100000),
             ]
-            
+
             valid_prices = []
             seen_prices = set()
-            
+
             for pattern, currency_code, min_val, max_val in local_currency_patterns:
                 matches = re.findall(pattern, page_text, re.IGNORECASE)
                 if matches:
                     print(f"Found {len(matches)} {currency_code} matches in page text")
-                    
+
                     for match in matches:
                         try:
                             # Handle both single group and two-group patterns
@@ -730,7 +730,7 @@ def extract_flight_prices(driver):
                                 price_value_str = match[1] if len(match) > 1 else match[0]
                             else:
                                 price_value_str = match
-                            
+
                             price_value = int(price_value_str.replace(",", ""))
                             if min_val <= price_value <= max_val and price_value not in seen_prices:
                                 valid_prices.append(f"{currency_code} {price_value_str}")
@@ -739,7 +739,7 @@ def extract_flight_prices(driver):
                                     break
                         except (ValueError, IndexError):
                             continue
-                    
+
                     if valid_prices:
                         break  # Found prices in this currency, stop searching other currencies
 
@@ -795,7 +795,7 @@ def get_nordvpn_countries():
                     seen.add(country_clean.lower())
 
             print(f"Found {len(unique_countries)} available countries: {unique_countries[:10]}...")
-            return unique_countries
+            return unique_countries[:3]
 
         else:
             print(f"Error getting NordVPN countries: {result.stderr}")
