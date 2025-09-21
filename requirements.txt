@@ -3,4 +3,4 @@ webdriver-manager
 pandas
 matplotlib
 pillow
-boto3
+boto3==1.35.0
