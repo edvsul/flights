@@ -984,11 +984,13 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
         os.makedirs("screenshots", exist_ok=True)
         screenshot_file = f"screenshots/{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}{country_suffix}.png"
 
+        print(f"Screenshot file: {screenshot_file}")
+
         BUCKET = 'countries-flights-screenshots'
+        print(f"Bucket: {BUCKET}")
         try:
             client = b.client(service_name="s3",region_name="eu-north-1")
-            key = f"screenshots/{os.path.basename(screenshot_file)}"
-            client.upload_file(screenshot_file, BUCKET, key)
+            client.upload_file(screenshot_file, BUCKET, screenshot_file)
             print(f"Screenshot uploaded to S3: s3://{BUCKET}/{screenshot_file}")
         except Exception as e:
             print(f"Error creating S3 client: {e}")
