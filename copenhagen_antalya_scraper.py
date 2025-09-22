@@ -988,16 +988,13 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
 
         BUCKET = 'countries-flights-screenshots'
         print(f"Bucket: {BUCKET}")
-        try:
-            client = b.client(service_name="s3",region_name="eu-north-1")
-            client.upload_file(screenshot_file, BUCKET, screenshot_file)
-            print(f"Screenshot uploaded to S3: s3://{BUCKET}/{screenshot_file}")
-        except Exception as e:
-            print(f"Error creating S3 client: {e}")
-            return pd.DataFrame()
 
         driver.save_screenshot(screenshot_file)
         print(f"Screenshot saved to {screenshot_file}")
+
+        client = b.client('s3')
+        response = client.upload_file(screenshot_file, BUCKET, screenshot_file)
+        print(f"Response from s3 client: {response}")
 
         flight_data = extract_flight_prices(driver)
 
