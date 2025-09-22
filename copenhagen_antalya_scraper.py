@@ -19,6 +19,7 @@ import tempfile
 from selenium.webdriver.common.keys import Keys
 import subprocess
 import boto3 as b
+from datetime import datetime
 
 
 def setup_driver():
@@ -995,7 +996,7 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
         client = b.client('s3')
         client.put_object(
             Body='The time now is '+str(datetime.now()),
-            Bucket='my-ec2-files-project',
+            Bucket=BUCKET,
             Key='ec2.txt')
         #response = client.upload_file(screenshot_file, BUCKET, screenshot_file)
         #print(f"Response from s3 client: {response}")
