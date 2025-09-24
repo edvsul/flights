@@ -251,180 +251,81 @@ def apply_nonstop_filter(driver):
 
 
 def select_eur_currency(driver):
-    """Select EUR currency on Google Flights with multiple attempts and verification."""
-    max_attempts = 3
+    """Select EUR currency on Google Flights."""
+    try:
+        print("Attempting to select EUR currency...")
+        time.sleep(5)
 
-    for attempt in range(max_attempts):
-        try:
-            print(f"Attempting to select EUR currency (attempt {attempt + 1}/{max_attempts})...")
+        # Check if EUR is already selected
+        page_text = driver.find_element(By.TAG_NAME, "body").text
+        if "€" in page_text:
+            print("EUR currency appears to already be selected")
+            return True
 
-            # Wait for page to load
-            time.sleep(5)
+        # Find currency button
+        currency_selectors = [
+            "//button[@aria-label='Currency']",
+            "//div[contains(@aria-label, 'Currency')][@role='button']",
+            "//button[contains(text(), 'Currency')]"
+        ]
 
-            # Check if EUR is already selected by looking at page content
-            page_text = driver.find_element(By.TAG_NAME, "body").text
-            if "€" in page_text and ("EUR" in page_text or any(eur_price in page_text for eur_price in ["€1", "€2", "€3", "€4", "€5", "€6", "€7", "€8", "€9"])):
-                print("EUR currency appears to already be selected")
-                return True
-
-            # Multiple selectors for currency button/dropdown - enhanced with local currency patterns
-            currency_selectors = [
-                "//button[@aria-label='Currency']",
-                "//div[contains(@aria-label, 'Currency')][@role='button']",
-                "//button[contains(text(), 'Currency') or contains(@aria-label, 'currency')]",
-                "//div[contains(text(), 'Currency')]/parent::div[@role='button']",
-                "//button[contains(@data-value, 'currency')]",
-                # Look for buttons with various currency codes that might appear
-                "//div[@role='button'][contains(., 'AFN') or contains(., 'AUD') or contains(., 'DKK') or contains(., 'SEK') or contains(., 'USD') or contains(., 'EUR')]",
-                "//button[contains(., 'AFN') or contains(., 'AUD') or contains(., 'DKK') or contains(., 'SEK') or contains(., 'USD') or contains(., 'EUR')]",
-                # Look for currency symbols
-                "//button[contains(., '€') or contains(., '$') or contains(., 'kr')]",
-                "//div[@role='button'][contains(., '€') or contains(., '$') or contains(., 'kr')]"
-            ]
-
-            currency_button = None
-            for selector in currency_selectors:
-                try:
-                    elements = driver.find_elements(By.XPATH, selector)
-                    if elements:
-                        for element in elements:
-                            if element.is_displayed():
-                                currency_button = element
-                                print(f"Found currency selector with: {selector}")
-                                print(f"Currency button text: '{element.text.strip()}'")
-                                break
-                        if currency_button:
-                            break
-                except:
-                    continue
-
-            if not currency_button:
-                print("Could not find currency selector button, trying to proceed anyway...")
-                if attempt < max_attempts - 1:
-                    continue
-                else:
-                    return False
-
-            # Click currency button
-            driver.execute_script("arguments[0].click();", currency_button)
-            time.sleep(3)
-
-            # Look for EUR option in dropdown/menu - enhanced selectors
-            eur_selectors = [
-                "//div[contains(text(), 'EUR') and contains(text(), '€')]",
-                "//span[contains(text(), 'EUR') and contains(text(), '€')]",
-                "//li[contains(text(), 'EUR') or contains(text(), '€')]",
-                "//div[@role='option'][contains(text(), 'EUR') or contains(text(), '€')]",
-                "//button[contains(text(), 'EUR') and contains(text(), '€')]",
-                "//div[contains(text(), 'Euro') or contains(text(), 'EUR')]",
-                "//span[text()='EUR']",
-                "//div[text()='EUR']",
-                # More specific EUR patterns
-                "//div[contains(text(), 'EUR - Euro')]",
-                "//span[contains(text(), 'EUR - Euro')]",
-                "//li[contains(text(), 'EUR - Euro')]",
-                "//div[@role='option'][contains(text(), 'EUR - Euro')]"
-            ]
-
-            eur_selected = False
-            for selector in eur_selectors:
-                try:
-                    elements = driver.find_elements(By.XPATH, selector)
-                    if elements:
-                        for element in elements:
-                            if element.is_displayed():
-                                print(f"Found EUR option with selector: {selector}")
-                                print(f"EUR option text: '{element.text.strip()}'")
-                                driver.execute_script("arguments[0].click();", element)
-                                print("Selected EUR currency")
-                                time.sleep(3)
-                                eur_selected = True
-                                break
-                        if eur_selected:
-                            break
-                except:
-                    continue
-
-            if not eur_selected:
-                print("Could not find EUR option in currency menu")
-                # Try to close any open menus by clicking elsewhere
-                try:
-                    driver.find_element(By.TAG_NAME, "body").click()
-                    time.sleep(2)
-                except:
-                    pass
-                if attempt < max_attempts - 1:
-                    print("Retrying EUR selection...")
-                    continue
-                else:
-                    return False
-
-            # Enhanced confirmation button search
-            confirmation_selectors = [
-                "//button[text()='OK']",
-                "//button[contains(text(), 'OK')]",
-                "//button[contains(text(), 'Done')]",
-                "//button[contains(text(), 'Apply')]",
-                "//button[contains(text(), 'Save')]",
-                "//div[@role='button'][contains(text(), 'OK')]",
-                "//div[@role='button'][contains(text(), 'Done')]",
-                "//div[@role='button'][contains(text(), 'Apply')]"
-            ]
-
-            confirmation_clicked = False
-            for selector in confirmation_selectors:
-                try:
-                    elements = driver.find_elements(By.XPATH, selector)
-                    if elements:
-                        for element in elements:
-                            if element.is_displayed() and element.is_enabled():
-                                element_text = element.text.strip()
-                                print(f"Found confirmation button: '{element_text}'")
-
-                                try:
-                                    element.click()
-                                    print(f"Clicked confirmation button: '{element_text}'")
-                                except:
-                                    driver.execute_script("arguments[0].click();", element)
-                                    print(f"Clicked confirmation button with JS: '{element_text}'")
-
-                                time.sleep(3)
-                                confirmation_clicked = True
-                                break
-                        if confirmation_clicked:
-                            break
-                except:
-                    continue
-
-            if not confirmation_clicked:
-                print("No confirmation button found, trying Enter key...")
-                try:
-                    driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ENTER)
-                    time.sleep(2)
-                except:
-                    pass
-
-            # Wait for currency change to take effect and verify
-            time.sleep(8)
-
-            # Verify EUR selection worked
-            updated_page_text = driver.find_element(By.TAG_NAME, "body").text
-            if "€" in updated_page_text:
-                print("SUCCESS: EUR currency selection verified - € symbol found on page")
-                return True
-            else:
-                print(f"EUR verification failed on attempt {attempt + 1}")
-                if attempt < max_attempts - 1:
-                    print("Retrying EUR selection...")
-                    continue
-
-        except Exception as e:
-            print(f"Error in EUR selection attempt {attempt + 1}: {e}")
-            if attempt < max_attempts - 1:
+        currency_button = None
+        for selector in currency_selectors:
+            try:
+                elements = driver.find_elements(By.XPATH, selector)
+                if elements and elements[0].is_displayed():
+                    currency_button = elements[0]
+                    break
+            except:
                 continue
 
-    print("Failed to select EUR currency after all attempts")
-    return False
+        if not currency_button:
+            print("Could not find currency selector button")
+            return False
+
+        # Click currency button
+        driver.execute_script("arguments[0].click();", currency_button)
+        time.sleep(3)
+
+        # Find and select EUR option
+        eur_selectors = [
+            "//div[contains(text(), 'EUR')]",
+            "//span[contains(text(), 'EUR')]",
+            "//li[contains(text(), 'EUR')]"
+        ]
+
+        for selector in eur_selectors:
+            try:
+                elements = driver.find_elements(By.XPATH, selector)
+                if elements and elements[0].is_displayed():
+                    driver.execute_script("arguments[0].click();", elements[0])
+                    time.sleep(3)
+                    break
+            except:
+                continue
+
+        # Click confirmation button if present
+        confirmation_selectors = [
+            "//button[contains(text(), 'OK')]",
+            "//button[contains(text(), 'Done')]"
+        ]
+
+        for selector in confirmation_selectors:
+            try:
+                elements = driver.find_elements(By.XPATH, selector)
+                if elements and elements[0].is_displayed():
+                    driver.execute_script("arguments[0].click();", elements[0])
+                    time.sleep(3)
+                    break
+            except:
+                continue
+
+        time.sleep(5)
+        return True
+
+    except Exception as e:
+        print(f"Error selecting EUR currency: {e}")
+        return False
 
 
 def extract_flight_prices(driver):
@@ -447,14 +348,14 @@ def extract_flight_prices(driver):
                     continue
 
                 visible_flights += 1
-                if visible_flights > 15:  # Increased to catch more flights
+                if visible_flights > 10:
                     break
 
-                # Extract price from element text - prioritize EUR
+                # Extract price from element text
                 text = flight_element.text
-                print(f"Checking flight element {visible_flights}: {text[:100]}...")  # Debug output
+                print(f"Checking flight element {visible_flights}: {text[:100]}...")
 
-                # First try to find EUR prices specifically - improved patterns
+                # Look for EUR prices
                 eur_price_patterns = [
                     r"€\s*([0-9,]+)",           # €1,951
                     r"EUR\s*([0-9,]+)",         # EUR 1951
@@ -466,169 +367,34 @@ def extract_flight_prices(driver):
                     eur_price_match = re.search(pattern, text)
                     if eur_price_match:
                         price_value = int(eur_price_match.group(1).replace(",", ""))
-                        if 100 <= price_value <= 50000:
+                        if 100 <= price_value <= 10000:
                             price = f"€{eur_price_match.group(1)}"
-
-                            # Check if nonstop (more lenient since filter was applied)
-                            element_text = text.lower()
-                            is_nonstop = ("nonstop" in element_text or "non-stop" in element_text or
-                                        "direct" in element_text or len(flight_data) == 0)  # Assume first flights are nonstop after filter
-
                             flight_data.append({'price': price, 'is_nonstop': True})
                             print(f"Found EUR flight with price: {price}")
-                            break  # Found EUR price, don't check other patterns
+                            break
 
-                # If no EUR found, try local currencies from all NordVPN countries
-                if not any(eur_price_match for pattern in eur_price_patterns if re.search(pattern, text)):
-                    # Comprehensive currency patterns for all major countries
-                    local_currency_patterns = [
-                        # Major currencies with symbols
-                        (r"\$\s*([0-9,]+)", "USD", 50, 10000),      # US Dollar
-                        (r"£\s*([0-9,]+)", "GBP", 50, 8000),        # British Pound
-                        (r"¥\s*([0-9,]+)", "JPY", 5000, 1000000),   # Japanese Yen
-                        (r"₹\s*([0-9,]+)", "INR", 3000, 800000),    # Indian Rupee
-                        (r"₽\s*([0-9,]+)", "RUB", 5000, 1000000),   # Russian Ruble
-                        (r"₩\s*([0-9,]+)", "KRW", 100000, 15000000), # South Korean Won
-                        (r"¢\s*([0-9,]+)", "CNY", 500, 70000),      # Chinese Yuan
-                        (r"₪\s*([0-9,]+)", "ILS", 200, 35000),      # Israeli Shekel
-                        (r"₺\s*([0-9,]+)", "TRY", 1000, 300000),    # Turkish Lira
-                        (r"₴\s*([0-9,]+)", "UAH", 2000, 400000),    # Ukrainian Hryvnia
-                        (r"₡\s*([0-9,]+)", "CRC", 50000, 6000000),  # Costa Rican Colón
-                        (r"₦\s*([0-9,]+)", "NGN", 50000, 15000000), # Nigerian Naira
-                        (r"₨\s*([0-9,]+)", "PKR", 15000, 3000000),  # Pakistani Rupee
-                        (r"₱\s*([0-9,]+)", "PHP", 3000, 600000),    # Philippine Peso
-                        (r"₫\s*([0-9,]+)", "VND", 1000000, 250000000), # Vietnamese Dong
-                        (r"₯\s*([0-9,]+)", "GRD", 200, 35000),      # Greek Drachma (legacy)
-
-                        # Currency codes with amounts
-                        (r"(USD|US\$)\s*([0-9,]+)", "USD", 50, 10000),
-                        (r"(GBP|GB£)\s*([0-9,]+)", "GBP", 50, 8000),
-                        (r"(CAD|C\$)\s*([0-9,]+)", "CAD", 70, 13000),
-                        (r"(AUD|A\$)\s*([0-9,]+)", "AUD", 80, 15000),
-                        (r"(CHF)\s*([0-9,]+)", "CHF", 50, 9000),
-                        (r"(SEK)\s*([0-9,]+)", "SEK", 500, 100000),
-                        (r"(NOK)\s*([0-9,]+)", "NOK", 500, 100000),
-                        (r"(DKK)\s*([0-9,]+)", "DKK", 400, 70000),
-                        (r"(PLN)\s*([0-9,]+)", "PLN", 200, 40000),
-                        (r"(CZK)\s*([0-9,]+)", "CZK", 1500, 250000),
-                        (r"(HUF)\s*([0-9,]+)", "HUF", 20000, 3500000),
-                        (r"(RON)\s*([0-9,]+)", "RON", 250, 45000),
-                        (r"(BGN)\s*([0-9,]+)", "BGN", 100, 18000),
-                        (r"(HRK)\s*([0-9,]+)", "HRK", 400, 70000),
-                        (r"(RSD)\s*([0-9,]+)", "RSD", 6000, 1100000),
-                        (r"(BAM)\s*([0-9,]+)", "BAM", 100, 18000),
-                        (r"(MKD)\s*([0-9,]+)", "MKD", 3000, 550000),
-                        (r"(ALL)\s*([0-9,]+)", "ALL", 6000, 1100000),
-                        (r"(RUB)\s*([0-9,]+)", "RUB", 5000, 1000000),
-                        (r"(UAH)\s*([0-9,]+)", "UAH", 2000, 400000),
-                        (r"(BYN)\s*([0-9,]+)", "BYN", 150, 25000),
-                        (r"(MDL)\s*([0-9,]+)", "MDL", 1000, 180000),
-                        (r"(GEL)\s*([0-9,]+)", "GEL", 150, 27000),
-                        (r"(AMD)\s*([0-9,]+)", "AMD", 25000, 4500000),
-                        (r"(AZN)\s*([0-9,]+)", "AZN", 100, 17000),
-                        (r"(KZT)\s*([0-9,]+)", "KZT", 25000, 4500000),
-                        (r"(UZS)\s*([0-9,]+)", "UZS", 600000, 110000000),
-                        (r"(KGS)\s*([0-9,]+)", "KGS", 5000, 900000),
-                        (r"(TJS)\s*([0-9,]+)", "TJS", 600, 110000),
-                        (r"(TMT)\s*([0-9,]+)", "TMT", 200, 35000),
-                        (r"(AFN)\s*([0-9,]+)", "AFN", 5000, 900000),
-                        (r"(PKR)\s*([0-9,]+)", "PKR", 15000, 3000000),
-                        (r"(INR)\s*([0-9,]+)", "INR", 3000, 800000),
-                        (r"(LKR)\s*([0-9,]+)", "LKR", 20000, 3500000),
-                        (r"(BDT)\s*([0-9,]+)", "BDT", 6000, 1100000),
-                        (r"(NPR)\s*([0-9,]+)", "NPR", 7000, 1300000),
-                        (r"(BTN)\s*([0-9,]+)", "BTN", 4000, 750000),
-                        (r"(MVR)\s*([0-9,]+)", "MVR", 800, 150000),
-                        (r"(CNY|RMB)\s*([0-9,]+)", "CNY", 500, 70000),
-                        (r"(HKD)\s*([0-9,]+)", "HKD", 500, 80000),
-                        (r"(TWD)\s*([0-9,]+)", "TWD", 2000, 320000),
-                        (r"(SGD)\s*([0-9,]+)", "SGD", 80, 14000),
-                        (r"(MYR)\s*([0-9,]+)", "MYR", 250, 45000),
-                        (r"(THB)\s*([0-9,]+)", "THB", 2000, 350000),
-                        (r"(IDR)\s*([0-9,]+)", "IDR", 800000, 150000000),
-                        (r"(PHP)\s*([0-9,]+)", "PHP", 3000, 600000),
-                        (r"(VND)\s*([0-9,]+)", "VND", 1000000, 250000000),
-                        (r"(KHR)\s*([0-9,]+)", "KHR", 250000, 45000000),
-                        (r"(LAK)\s*([0-9,]+)", "LAK", 1000000, 180000000),
-                        (r"(MMK)\s*([0-9,]+)", "MMK", 120000, 22000000),
-                        (r"(BND)\s*([0-9,]+)", "BND", 80, 14000),
-                        (r"(JPY)\s*([0-9,]+)", "JPY", 5000, 1000000),
-                        (r"(KRW)\s*([0-9,]+)", "KRW", 100000, 15000000),
-                        (r"(MNT)\s*([0-9,]+)", "MNT", 150000, 27000000),
-
-                        # African currencies
-                        (r"(ZAR)\s*([0-9,]+)", "ZAR", 1000, 180000),
-                        (r"(EGP)\s*([0-9,]+)", "EGP", 1500, 270000),
-                        (r"(NGN)\s*([0-9,]+)", "NGN", 50000, 15000000),
-                        (r"(KES)\s*([0-9,]+)", "KES", 7000, 1300000),
-                        (r"(GHS)\s*([0-9,]+)", "GHS", 700, 130000),
-                        (r"(MAD)\s*([0-9,]+)", "MAD", 600, 110000),
-                        (r"(TND)\s*([0-9,]+)", "TND", 200, 35000),
-                        (r"(DZD)\s*([0-9,]+)", "DZD", 8000, 1400000),
-                        (r"(AOA)\s*([0-9,]+)", "AOA", 30000, 5500000),
-                        (r"(XAF)\s*([0-9,]+)", "XAF", 35000, 6500000),  # Central African CFA
-                        (r"(XOF)\s*([0-9,]+)", "XOF", 35000, 6500000),  # West African CFA
-
-                        # Middle Eastern currencies
-                        (r"(SAR)\s*([0-9,]+)", "SAR", 200, 38000),
-                        (r"(AED)\s*([0-9,]+)", "AED", 200, 37000),
-                        (r"(QAR)\s*([0-9,]+)", "QAR", 200, 37000),
-                        (r"(KWD)\s*([0-9,]+)", "KWD", 20, 3000),
-                        (r"(BHD)\s*([0-9,]+)", "BHD", 25, 3800),
-                        (r"(OMR)\s*([0-9,]+)", "OMR", 25, 3900),
-                        (r"(JOD)\s*([0-9,]+)", "JOD", 45, 7200),
-                        (r"(LBP)\s*([0-9,]+)", "LBP", 90000, 15000000),
-                        (r"(SYP)\s*([0-9,]+)", "SYP", 150000, 25000000),
-                        (r"(IQD)\s*([0-9,]+)", "IQD", 80000, 13000000),
-                        (r"(IRR)\s*([0-9,]+)", "IRR", 2500000, 420000000),
-
-                        # Latin American currencies
-                        (r"(MXN)\s*([0-9,]+)", "MXN", 1200, 200000),
-                        (r"(BRL)\s*([0-9,]+)", "BRL", 300, 55000),
-                        (r"(ARS)\s*([0-9,]+)", "ARS", 60000, 10000000),
-                        (r"(CLP)\s*([0-9,]+)", "CLP", 50000, 9000000),
-                        (r"(COP)\s*([0-9,]+)", "COP", 250000, 45000000),
-                        (r"(PEN)\s*([0-9,]+)", "PEN", 200, 37000),
-                        (r"(UYU)\s*([0-9,]+)", "UYU", 2500, 450000),
-                        (r"(PYG)\s*([0-9,]+)", "PYG", 400000, 70000000),
-                        (r"(BOB)\s*([0-9,]+)", "BOB", 400, 70000),
-                        (r"(VES)\s*([0-9,]+)", "VES", 200000, 36000000),
-                        (r"(GYD)\s*([0-9,]+)", "GYD", 12000, 2100000),
-                        (r"(SRD)\s*([0-9,]+)", "SRD", 2000, 360000),
-                        (r"(TTD)\s*([0-9,]+)", "TTD", 400, 68000),
-                        (r"(JMD)\s*([0-9,]+)", "JMD", 9000, 1500000),
-                        (r"(BBD)\s*([0-9,]+)", "BBD", 120, 20000),
-                        (r"(BZD)\s*([0-9,]+)", "BZD", 120, 20000),
-                        (r"(GTQ)\s*([0-9,]+)", "GTQ", 450, 78000),
-                        (r"(HNL)\s*([0-9,]+)", "HNL", 1500, 250000),
-                        (r"(NIO)\s*([0-9,]+)", "NIO", 2200, 370000),
-                        (r"(CRC)\s*([0-9,]+)", "CRC", 35000, 6200000),
-                        (r"(PAB)\s*([0-9,]+)", "PAB", 60, 10000),
-                        (r"(DOP)\s*([0-9,]+)", "DOP", 3500, 600000),
-                        (r"(HTG)\s*([0-9,]+)", "HTG", 8000, 1400000),
-                        (r"(CUP)\s*([0-9,]+)", "CUP", 150, 25000),
-
-                        # Generic patterns for kr (Nordic countries)
-                        (r"([0-9,]+)\s*kr", "kr", 500, 100000),
-                        (r"kr\s*([0-9,]+)", "kr", 500, 100000),
+                # If no EUR found, try basic fallback currencies
+                if not any(re.search(pattern, text) for pattern in eur_price_patterns):
+                    # Basic fallback patterns for common currencies
+                    fallback_patterns = [
+                        (r"\$\s*([0-9,]+)", "USD", 50, 5000),
+                        (r"£\s*([0-9,]+)", "GBP", 50, 4000),
+                        (r"(DKK)\s*([0-9,]+)", "DKK", 400, 35000),
+                        (r"(AFN)\s*([0-9,]+)", "AFN", 5000, 500000),
+                        (r"([0-9,]+)\s*kr", "kr", 500, 50000)
                     ]
 
-                    for pattern, currency_code, min_val, max_val in local_currency_patterns:
+                    for pattern, currency_code, min_val, max_val in fallback_patterns:
                         price_match = re.search(pattern, text, re.IGNORECASE)
                         if price_match:
-                            # Extract price value (handle both single group and two-group patterns)
-                            if len(price_match.groups()) == 1:
-                                price_value_str = price_match.group(1)
-                            else:
-                                price_value_str = price_match.group(2)
-
+                            price_value_str = price_match.group(1) if len(price_match.groups()) == 1 else price_match.group(2)
                             try:
                                 price_value = int(price_value_str.replace(",", ""))
                                 if min_val <= price_value <= max_val:
                                     price = f"{currency_code} {price_value_str}"
                                     flight_data.append({'price': price, 'is_nonstop': True})
                                     print(f"Found {currency_code} flight with price: {price}")
-                                    break  # Found a valid price, stop searching
+                                    break
                             except ValueError:
                                 continue
 
@@ -638,18 +404,17 @@ def extract_flight_prices(driver):
 
         print(f"Processed {visible_flights} visible flight elements")
 
-    # Enhanced fallback: extract from page text if no flight elements found
+    # Fallback: extract from page text if no flight elements found
     if not flight_data:
         print("No flight elements found, trying page text extraction")
         page_text = driver.find_element(By.TAG_NAME, "body").text
-        print(f"Page text sample: {page_text[:500]}...")  # Debug output
 
-        # First try to find EUR prices in page text - improved patterns
+        # Try to find EUR prices in page text
         eur_price_patterns = [
-            r"€\s*([0-9,]+)",           # €1,951
-            r"EUR\s*([0-9,]+)",         # EUR 1951
-            r"([0-9,]+)\s*€",           # 1951 €
-            r"([0-9,]+)\s*EUR"          # 1951 EUR
+            r"€\s*([0-9,]+)",
+            r"EUR\s*([0-9,]+)",
+            r"([0-9,]+)\s*€",
+            r"([0-9,]+)\s*EUR"
         ]
 
         all_eur_matches = []
@@ -658,7 +423,6 @@ def extract_flight_prices(driver):
             all_eur_matches.extend(matches)
 
         if all_eur_matches:
-            print(f"Found {len(all_eur_matches)} EUR price matches in page text")
             valid_prices = []
             seen_prices = set()
 
@@ -668,7 +432,7 @@ def extract_flight_prices(driver):
                     if 100 <= price_value <= 10000 and price_value not in seen_prices:
                         valid_prices.append(f"€{price}")
                         seen_prices.add(price_value)
-                        if len(valid_prices) >= 5:  # Get more prices
+                        if len(valid_prices) >= 3:
                             break
                 except:
                     continue
@@ -677,125 +441,30 @@ def extract_flight_prices(driver):
                 flight_data.append({'price': price, 'is_nonstop': True})
                 print(f"Extracted EUR price from page text: {price}")
 
-        # Fallback to local currencies if no EUR found
+        # Basic fallback to other currencies if no EUR found
         if not flight_data:
-            print("Trying comprehensive currency extraction from page text...")
-
-            # Use the same comprehensive currency patterns as above
-            local_currency_patterns = [
-                # Major currencies with symbols
-                (r"\$\s*([0-9,]+)", "USD", 50, 10000),
-                (r"£\s*([0-9,]+)", "GBP", 50, 8000),
-                (r"¥\s*([0-9,]+)", "JPY", 5000, 1000000),
-                (r"₹\s*([0-9,]+)", "INR", 3000, 800000),
-                (r"₽\s*([0-9,]+)", "RUB", 5000, 1000000),
-                (r"₩\s*([0-9,]+)", "KRW", 100000, 15000000),
-                (r"¢\s*([0-9,]+)", "CNY", 500, 70000),
-                (r"₪\s*([0-9,]+)", "ILS", 200, 35000),
-                (r"₺\s*([0-9,]+)", "TRY", 1000, 300000),
-                (r"₴\s*([0-9,]+)", "UAH", 2000, 400000),
-                (r"₦\s*([0-9,]+)", "NGN", 50000, 15000000),
-                (r"₨\s*([0-9,]+)", "PKR", 15000, 3000000),
-                (r"₱\s*([0-9,]+)", "PHP", 3000, 600000),
-                (r"₫\s*([0-9,]+)", "VND", 1000000, 250000000),
-
-                # Currency codes - most common ones first
-                (r"(AFN)\s*([0-9,]+)", "AFN", 5000, 900000),
-                (r"(AUD|A\$)\s*([0-9,]+)", "AUD", 80, 15000),
-                (r"(CAD|C\$)\s*([0-9,]+)", "CAD", 70, 13000),
-                (r"(CHF)\s*([0-9,]+)", "CHF", 50, 9000),
-                (r"(CNY|RMB)\s*([0-9,]+)", "CNY", 500, 70000),
-                (r"(DKK)\s*([0-9,]+)", "DKK", 400, 70000),
-                (r"(GBP|GB£)\s*([0-9,]+)", "GBP", 50, 8000),
-                (r"(HKD)\s*([0-9,]+)", "HKD", 500, 80000),
-                (r"(IDR)\s*([0-9,]+)", "IDR", 800000, 150000000),
-                (r"(INR)\s*([0-9,]+)", "INR", 3000, 800000),
-                (r"(JPY)\s*([0-9,]+)", "JPY", 5000, 1000000),
-                (r"(KRW)\s*([0-9,]+)", "KRW", 100000, 15000000),
-                (r"(MYR)\s*([0-9,]+)", "MYR", 250, 45000),
-                (r"(NOK)\s*([0-9,]+)", "NOK", 500, 100000),
-                (r"(NZD)\s*([0-9,]+)", "NZD", 90, 16000),
-                (r"(PHP)\s*([0-9,]+)", "PHP", 3000, 600000),
-                (r"(PLN)\s*([0-9,]+)", "PLN", 200, 40000),
-                (r"(RUB)\s*([0-9,]+)", "RUB", 5000, 1000000),
-                (r"(SEK)\s*([0-9,]+)", "SEK", 500, 100000),
-                (r"(SGD)\s*([0-9,]+)", "SGD", 80, 14000),
-                (r"(THB)\s*([0-9,]+)", "THB", 2000, 350000),
-                (r"(TRY)\s*([0-9,]+)", "TRY", 1000, 300000),
-                (r"(TWD)\s*([0-9,]+)", "TWD", 2000, 320000),
-                (r"(USD|US\$)\s*([0-9,]+)", "USD", 50, 10000),
-                (r"(VND)\s*([0-9,]+)", "VND", 1000000, 250000000),
-                (r"(ZAR)\s*([0-9,]+)", "ZAR", 1000, 180000),
-
-                # Middle Eastern & African
-                (r"(AED)\s*([0-9,]+)", "AED", 200, 37000),
-                (r"(EGP)\s*([0-9,]+)", "EGP", 1500, 270000),
-                (r"(ILS)\s*([0-9,]+)", "ILS", 200, 35000),
-                (r"(JOD)\s*([0-9,]+)", "JOD", 45, 7200),
-                (r"(KES)\s*([0-9,]+)", "KES", 7000, 1300000),
-                (r"(KWD)\s*([0-9,]+)", "KWD", 20, 3000),
-                (r"(MAD)\s*([0-9,]+)", "MAD", 600, 110000),
-                (r"(NGN)\s*([0-9,]+)", "NGN", 50000, 15000000),
-                (r"(QAR)\s*([0-9,]+)", "QAR", 200, 37000),
-                (r"(SAR)\s*([0-9,]+)", "SAR", 200, 38000),
-                (r"(TND)\s*([0-9,]+)", "TND", 200, 35000),
-
-                # Latin American
-                (r"(ARS)\s*([0-9,]+)", "ARS", 60000, 10000000),
-                (r"(BRL)\s*([0-9,]+)", "BRL", 300, 55000),
-                (r"(CLP)\s*([0-9,]+)", "CLP", 50000, 9000000),
-                (r"(COP)\s*([0-9,]+)", "COP", 250000, 45000000),
-                (r"(MXN)\s*([0-9,]+)", "MXN", 1200, 200000),
-                (r"(PEN)\s*([0-9,]+)", "PEN", 200, 37000),
-
-                # Eastern European
-                (r"(BGN)\s*([0-9,]+)", "BGN", 100, 18000),
-                (r"(CZK)\s*([0-9,]+)", "CZK", 1500, 250000),
-                (r"(HRK)\s*([0-9,]+)", "HRK", 400, 70000),
-                (r"(HUF)\s*([0-9,]+)", "HUF", 20000, 3500000),
-                (r"(RON)\s*([0-9,]+)", "RON", 250, 45000),
-                (r"(UAH)\s*([0-9,]+)", "UAH", 2000, 400000),
-
-                # Central Asian
-                (r"(KZT)\s*([0-9,]+)", "KZT", 25000, 4500000),
-                (r"(UZS)\s*([0-9,]+)", "UZS", 600000, 110000000),
-
-                # Generic kr pattern (Nordic countries)
-                (r"([0-9,]+)\s*kr", "kr", 500, 100000),
-                (r"kr\s*([0-9,]+)", "kr", 500, 100000),
+            fallback_patterns = [
+                (r"\$\s*([0-9,]+)", "USD", 50, 5000),
+                (r"(DKK)\s*([0-9,]+)", "DKK", 400, 35000),
+                (r"(AFN)\s*([0-9,]+)", "AFN", 5000, 500000),
+                (r"([0-9,]+)\s*kr", "kr", 500, 50000)
             ]
 
-            valid_prices = []
-            seen_prices = set()
-
-            for pattern, currency_code, min_val, max_val in local_currency_patterns:
+            for pattern, currency_code, min_val, max_val in fallback_patterns:
                 matches = re.findall(pattern, page_text, re.IGNORECASE)
                 if matches:
-                    print(f"Found {len(matches)} {currency_code} matches in page text")
-
-                    for match in matches:
+                    for match in matches[:2]:  # Only take first 2 matches
                         try:
-                            # Handle both single group and two-group patterns
-                            if isinstance(match, tuple):
-                                price_value_str = match[1] if len(match) > 1 else match[0]
-                            else:
-                                price_value_str = match
-
+                            price_value_str = match[1] if isinstance(match, tuple) and len(match) > 1 else match
                             price_value = int(price_value_str.replace(",", ""))
-                            if min_val <= price_value <= max_val and price_value not in seen_prices:
-                                valid_prices.append(f"{currency_code} {price_value_str}")
-                                seen_prices.add(price_value)
-                                if len(valid_prices) >= 5:  # Get up to 5 prices
-                                    break
+                            if min_val <= price_value <= max_val:
+                                price = f"{currency_code} {price_value_str}"
+                                flight_data.append({'price': price, 'is_nonstop': True})
+                                print(f"Extracted {currency_code} price: {price}")
                         except (ValueError, IndexError):
                             continue
-
-                    if valid_prices:
-                        break  # Found prices in this currency, stop searching other currencies
-
-            for price in valid_prices:
-                flight_data.append({'price': price, 'is_nonstop': True})
-                print(f"Extracted local currency price: {price}")
+                    if flight_data:  # Stop after finding prices in one currency
+                        break
 
     print(f"Total flight data extracted: {len(flight_data)} flights")
     return flight_data
@@ -918,41 +587,20 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
     driver = setup_driver()
 
     try:
-        # Try multiple URL approaches to force EUR currency
+        # Use the working EUR URL approach
         base_url = f"https://www.google.com/travel/flights?q=Flights%20to%20{destination}%20from%20{origin}%20on%20{depart_date}%20through%20{return_date}"
+        url = f"{base_url}&curr=EUR"
+        
+        print(f"Trying URL approach 1: {url}")
+        driver.get(url)
+        time.sleep(5)
 
-        # Try different EUR parameter variations
-        eur_urls = [
-            f"{base_url}&curr=EUR",
-            f"{base_url}&currency=EUR",
-            f"{base_url}&hl=en&gl=DE&curr=EUR",  # German locale with EUR
-            f"https://www.google.com/travel/flights?hl=en&gl=DE&curr=EUR&q=Flights%20to%20{destination}%20from%20{origin}%20on%20{depart_date}%20through%20{return_date}"
-        ]
-
-        success = False
-        for i, url in enumerate(eur_urls):
-            try:
-                print(f"Trying URL approach {i+1}: {url}")
-                driver.get(url)
-                time.sleep(5)
-
-                # Quick check if EUR symbols appear
-                page_text = driver.find_element(By.TAG_NAME, "body").text
-                if "€" in page_text:
-                    print(f"SUCCESS: EUR symbols found with URL approach {i+1}")
-                    success = True
-                    break
-                else:
-                    print(f"No EUR symbols found with URL approach {i+1}")
-
-            except Exception as e:
-                print(f"Error with URL approach {i+1}: {e}")
-                continue
-
-        if not success:
-            print("All URL approaches failed, using base URL")
-            driver.get(base_url)
-            time.sleep(5)
+        # Quick check if EUR symbols appear
+        page_text = driver.find_element(By.TAG_NAME, "body").text
+        if "€" in page_text:
+            print(f"SUCCESS: EUR symbols found with URL approach 1")
+        else:
+            print(f"No EUR symbols found with URL approach 1")
 
         # Handle consent page
         if not handle_consent_page(driver):
