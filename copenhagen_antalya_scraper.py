@@ -644,7 +644,7 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
         # Return DataFrame with country information
         if flight_data:
             return pd.DataFrame([{
-                'Country': country or 'Unknown',
+                'Country': country,
                 'Airline': 'Various',
                 'Price': flight['price'],
                 'Departure': 'See screenshot',
@@ -654,7 +654,7 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
             } for flight in flight_data])
         else:
             return pd.DataFrame([{
-                'Country': country or 'Unknown',
+                'Country': country,
                 'Airline': 'See screenshot',
                 'Price': 'No prices found',
                 'Departure': 'See screenshot',
@@ -724,8 +724,9 @@ def main():
     # Get available NordVPN countries
     countries = get_nordvpn_countries()
     if not countries:
-        print("No NordVPN countries available, running without VPN...")
-        countries = [None]  # Run once without VPN
+        print("ERROR: No NordVPN countries available. NordVPN is required for this script.")
+        print("Please ensure NordVPN is installed and you are logged in.")
+        return
     else:
         print(f"Found {len(countries)} NordVPN countries to test: {countries}")
 
@@ -738,49 +739,47 @@ def main():
 
     for i, country in enumerate(countries, 1):
         print(f"\n{'='*60}")
-        print(f"Processing country {i}/{len(countries)}: {country or 'No VPN'}")
+        print(f"Processing country {i}/{len(countries)}: {country}")
         print(f"{'='*60}")
 
-        # Connect to VPN if country is specified
-        if country:
-            print(f"Connecting to {country}...")
-            if not connect_to_nordvpn_country(country):
-                print(f"Failed to connect to {country}, skipping...")
-                failed_countries.append(country)
-                continue
-            print(f"Successfully connected to {country}, proceeding with scraping...")
+        # Connect to VPN (required)
+        print(f"Connecting to {country}...")
+        if not connect_to_nordvpn_country(country):
+            print(f"Failed to connect to {country}, skipping...")
+            failed_countries.append(country)
+            continue
+        print(f"Successfully connected to {country}, proceeding with scraping...")
 
         try:
             # Scrape flight data for this country with clean browser
-            print(f"Creating clean browser session for {country or 'No VPN'}...")
+            print(f"Creating clean browser session for {country}...")
             flight_data = scrape_flight_data(origin, destination, depart_date, return_date, country)
 
             if flight_data is not None and not flight_data.empty:
                 all_flight_data.append(flight_data)
-                successful_countries.append(country or 'No VPN')
-                print(f"Successfully scraped data for {country or 'No VPN'}: {len(flight_data)} flights found")
+                successful_countries.append(country)
+                print(f"Successfully scraped data for {country}: {len(flight_data)} flights found")
 
                 # Save individual country CSV file
                 os.makedirs("prices", exist_ok=True)
-                country_suffix = f"_{country}" if country else "_NoVPN"
+                country_suffix = f"_{country}"
                 individual_csv = f"prices/{origin}_to_{destination}_direct{country_suffix}.csv"
                 flight_data.to_csv(individual_csv, index=False)
                 print(f"Individual country data saved to {individual_csv}")
             else:
-                print(f"No flight data found for {country or 'No VPN'}")
-                failed_countries.append(country or 'No VPN')
+                print(f"No flight data found for {country}")
+                failed_countries.append(country)
 
         except Exception as e:
-            print(f"Error scraping data for {country or 'No VPN'}: {e}")
-            failed_countries.append(country or 'No VPN')
+            print(f"Error scraping data for {country}: {e}")
+            failed_countries.append(country)
 
         # Add a small delay between countries for stability
         if i < len(countries):
             time.sleep(3)  # Brief pause between countries
 
     # Final VPN disconnect
-    if countries and countries[0] is not None:
-        disconnect_nordvpn()
+    disconnect_nordvpn()
 
     # Combine all data and create consolidated report
     if all_flight_data:
