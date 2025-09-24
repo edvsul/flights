@@ -18,7 +18,6 @@ from selenium.webdriver.common.action_chains import ActionChains
 import tempfile
 from selenium.webdriver.common.keys import Keys
 import subprocess
-import boto3 as b
 from datetime import datetime
 
 
@@ -987,19 +986,8 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
 
         print(f"Screenshot file: {screenshot_file}")
 
-        BUCKET = 'countries-flights-screenshots'
-        print(f"Bucket: {BUCKET}")
-
         driver.save_screenshot(screenshot_file)
         print(f"Screenshot saved to {screenshot_file}")
-
-        client = b.client('s3')
-        client.put_object(
-            Body='The time now is '+str(datetime.now()),
-            Bucket=BUCKET,
-            Key='ec2.txt')
-        #response = client.upload_file(screenshot_file, BUCKET, screenshot_file)
-        #print(f"Response from s3 client: {response}")
 
         flight_data = extract_flight_prices(driver)
 
