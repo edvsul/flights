@@ -514,7 +514,7 @@ def get_nordvpn_countries():
                     seen.add(country_clean.lower())
 
             print(f"Found {len(unique_countries)} available countries: {unique_countries[:10]}...")
-            return unique_countries[:1]
+            return unique_countries
 
         else:
             print(f"Error getting NordVPN countries: {result.stderr}")
@@ -590,7 +590,7 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
         # Use the working EUR URL approach
         base_url = f"https://www.google.com/travel/flights?q=Flights%20to%20{destination}%20from%20{origin}%20on%20{depart_date}%20through%20{return_date}"
         url = f"{base_url}&curr=EUR"
-        
+
         print(f"Trying URL approach 1: {url}")
         driver.get(url)
         time.sleep(5)
