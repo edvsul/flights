@@ -55,3 +55,6 @@ debug_*.html
 *_element_sample.html
 *_dropdown_content.html
 flights_venv/
+
+# Chrome temp directories
+temp_chrome_sessions/

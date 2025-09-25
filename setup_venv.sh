@@ -61,8 +61,11 @@ fi
 # Upgrade pip
 pip install --upgrade pip
 
-# Install requirements
-pip install -r requirements.txt
+# Clear pip cache to avoid dependency conflicts
+pip cache purge
+
+# Install requirements with no-cache to avoid boto3 dependency loop
+pip install --no-cache-dir -r requirements.txt
 if [ $? -ne 0 ]; then
     echo_color $RED "Failed to install required packages."
     exit 1
