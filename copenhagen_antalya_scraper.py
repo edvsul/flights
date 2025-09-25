@@ -6,6 +6,7 @@ import random
 import shutil
 import uuid
 import pandas as pd
+import subprocess
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -19,6 +20,53 @@ import tempfile
 from selenium.webdriver.common.keys import Keys
 import subprocess
 from datetime import datetime
+
+
+def connect_to_vpn(country):
+    """Connect to NordVPN server in specified country."""
+    try:
+        print(f"Connecting to NordVPN server in {country}...")
+
+        # Disconnect any existing connection
+        subprocess.run(["nordvpn", "disconnect"], capture_output=True, text=True)
+        time.sleep(2)
+
+        # Connect to specified country
+        result = subprocess.run(["nordvpn", "connect", country], capture_output=True, text=True)
+
+        if result.returncode == 0:
+            print(f"Successfully connected to {country}")
+            time.sleep(5)  # Wait for connection to stabilize
+            return True
+        else:
+            print(f"Failed to connect to {country}: {result.stderr}")
+            return False
+
+    except Exception as e:
+        print(f"Error connecting to VPN: {e}")
+        return False
+
+
+def disconnect_vpn():
+    """Disconnect from NordVPN."""
+    try:
+        print("Disconnecting from VPN...")
+        subprocess.run(["nordvpn", "disconnect"], capture_output=True, text=True)
+        time.sleep(2)
+        print("Disconnected from VPN")
+    except Exception as e:
+        print(f"Error disconnecting from VPN: {e}")
+
+
+def get_current_ip():
+    """Get current IP address to verify VPN connection."""
+    try:
+        result = subprocess.run(["curl", "-s", "https://ipinfo.io/ip"], capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout.strip()
+        return "Unknown"
+    except:
+        return "Unknown"
 
 
 def setup_driver():
@@ -664,8 +712,8 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
             }])
 
     except Exception as e:
-        print(f"Error in scrape_flight_data function: {e}")
-        return pd.DataFrame()
+        print(f"Error in scrape_flight_data_for_country function: {e}")
+        return []
 
     finally:
         # Proper cleanup with temp directory removal
@@ -719,7 +767,53 @@ def main():
     depart_date = "2025-10-17"
     return_date = "2025-10-24"
 
-    print(f"Scraping flights from {origin} to {destination} on {depart_date} through {return_date}...")
+    # List of countries to test
+    countries = [
+        "Bosnia_And_Herzegovina",
+        "Croatia",
+        "Cyprus",
+        "Czech_Republic",
+        "Denmark",
+        "Estonia"
+    ]
+
+    # CSV file for all results
+    formatted_depart_date = depart_date.replace("-", "")
+    formatted_return_date = return_date.replace("-", "")
+    csv_file = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}_all_countries.csv"
+
+    print(f"Starting multi-country flight price comparison...")
+    print(f"Route: {origin} to {destination}")
+    print(f"Dates: {depart_date} to {return_date}")
+    print(f"Countries: {', '.join(countries)}")
+
+    all_results = []
+
+    for country in countries:
+        print(f"\n{'='*50}")
+        print(f"Processing {country}")
+        print(f"{'='*50}")
+
+        # Connect to VPN
+        if connect_to_vpn(country):
+            current_ip = get_current_ip()
+            print(f"Current IP: {current_ip}")
+
+            # Scrape flight data
+            flight_data = scrape_flight_data_for_country(origin, destination, depart_date, return_date, country)
+
+            # Add country info to each flight
+            for flight in flight_data:
+                flight['country'] = country
+                flight['ip'] = current_ip
+                all_results.append(flight)
+
+            print(f"Found {len(flight_data)} flights for {country}")
+        else:
+            print(f"Failed to connect to VPN for {country}, skipping...")
+
+        # Small delay between countries
+        time.sleep(5)
 
     # Get available NordVPN countries
     countries = get_nordvpn_countries()
