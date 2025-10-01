@@ -712,7 +712,7 @@ def scrape_flight_data(origin, destination, depart_date, return_date, country=No
             }])
 
     except Exception as e:
-        print(f"Error in scrape_flight_data_for_country function: {e}")
+        print(f"Error in scrape_flight_data function: {e}")
         return []
 
     finally:
@@ -767,53 +767,9 @@ def main():
     depart_date = "2025-10-17"
     return_date = "2025-10-24"
 
-    # List of countries to test
-    countries = [
-        "Bosnia_And_Herzegovina",
-        "Croatia",
-        "Cyprus",
-        "Czech_Republic",
-        "Denmark",
-        "Estonia"
-    ]
-
-    # CSV file for all results
-    formatted_depart_date = depart_date.replace("-", "")
-    formatted_return_date = return_date.replace("-", "")
-    csv_file = f"{origin}_to_{destination}_from_{formatted_depart_date}_to_{formatted_return_date}_all_countries.csv"
-
     print(f"Starting multi-country flight price comparison...")
     print(f"Route: {origin} to {destination}")
     print(f"Dates: {depart_date} to {return_date}")
-    print(f"Countries: {', '.join(countries)}")
-
-    all_results = []
-
-    for country in countries:
-        print(f"\n{'='*50}")
-        print(f"Processing {country}")
-        print(f"{'='*50}")
-
-        # Connect to VPN
-        if connect_to_vpn(country):
-            current_ip = get_current_ip()
-            print(f"Current IP: {current_ip}")
-
-            # Scrape flight data
-            flight_data = scrape_flight_data_for_country(origin, destination, depart_date, return_date, country)
-
-            # Add country info to each flight
-            for flight in flight_data:
-                flight['country'] = country
-                flight['ip'] = current_ip
-                all_results.append(flight)
-
-            print(f"Found {len(flight_data)} flights for {country}")
-        else:
-            print(f"Failed to connect to VPN for {country}, skipping...")
-
-        # Small delay between countries
-        time.sleep(5)
 
     # Get available NordVPN countries
     countries = get_nordvpn_countries()
