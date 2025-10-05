@@ -571,8 +571,8 @@ def get_nordvpn_countries():
                     unique_countries.append(country_clean)
                     seen.add(country_clean.lower())
 
-            print(f"Found {len(unique_countries)} available countries: {unique_countries[:10]}...")
-            return unique_countries
+            print(f"Found {len(unique_countries)} available countries: {unique_countries[:1]}...")
+            return unique_countries[:1]
 
         else:
             print(f"Error getting NordVPN countries: {result.stderr}")
