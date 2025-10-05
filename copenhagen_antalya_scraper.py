@@ -27,9 +27,8 @@ def upload_all_to_s3(bucket='flightscreenshots'):
     """Upload all screenshots and CSV files to S3"""
     s3 = boto3.client('s3')
     for file in os.listdir('screenshots'):
-        if not file.startswith('.'):
-            s3.upload_file(f"screenshots/{file}", bucket, f"screenshots/{file}")
-            print(f"Uploaded screenshots/{file}")
+        s3.upload_file(f"screenshots/{file}", bucket, f"screenshots/{file}")
+        print(f"Uploaded screenshots/{file}")
 
 
 def connect_to_vpn(country):
