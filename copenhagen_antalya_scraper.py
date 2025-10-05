@@ -7,6 +7,7 @@ import shutil
 import uuid
 import pandas as pd
 import subprocess
+import boto3
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -20,6 +21,14 @@ import tempfile
 from selenium.webdriver.common.keys import Keys
 import subprocess
 from datetime import datetime
+
+
+def upload_all_to_s3(bucket='flightscreenshots'):
+    """Upload all screenshots and CSV files to S3"""
+    s3 = boto3.client('s3')
+    for file in os.listdir('screenshots'):
+        s3.upload_file(f"screenshots/{file}", bucket, f"screenshots/{file}")
+        print(f"Uploaded screenshots/{file}")
 
 
 def connect_to_vpn(country):
@@ -830,6 +839,8 @@ def main():
 
     # Final VPN disconnect
     disconnect_nordvpn()
+
+    upload_all_to_s3()
 
     # Combine all data and create consolidated report
     if all_flight_data:
