@@ -14,7 +14,7 @@ This script automatically:
 
 ### Target Flight Details
 - **Route**: Copenhagen (CPH) → Auckland (AKL)
-- **Dates**: October 17-24, 2025 (7-day trip)
+- **Dates**: March 7-20, 2025 (14-day trip)
 - **Filter**: One stop or more flights only
 - **Currency**: EUR (forced via URL parameter)
 
