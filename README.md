@@ -1,21 +1,21 @@
-# Copenhagen to Antalya Flight Price Scraper
+# Copenhagen to Auckland Flight Price Scraper
 
-A comprehensive flight price monitoring tool that scrapes Google Flights for Copenhagen (CPH) to Antalya (AYT) flights using NordVPN to compare prices from different geographic locations.
+A comprehensive flight price monitoring tool that scrapes Google Flights for Copenhagen (CPH) to Auckland (AKL) flights using NordVPN to compare prices from different geographic locations.
 
 ## 🎯 What This Script Does
 
 This script automatically:
 - **Connects to multiple NordVPN countries** to simulate browsing from different locations
-- **Scrapes Google Flights** for direct/nonstop flights from Copenhagen to Antalya
+- **Scrapes Google Flights** for one stop flights from Copenhagen to Auckland
 - **Forces EUR currency** for consistent price comparison across all locations
 - **Captures screenshots** of flight results from each country
 - **Extracts flight prices** and saves them to CSV files
 - **Generates consolidated reports** comparing prices across all tested countries
 
 ### Target Flight Details
-- **Route**: Copenhagen (CPH) → Antalya (AYT)
+- **Route**: Copenhagen (CPH) → Auckland (AKL)
 - **Dates**: October 17-24, 2025 (7-day trip)
-- **Filter**: Direct/nonstop flights only
+- **Filter**: One stop or more flights only
 - **Currency**: EUR (forced via URL parameter)
 
 ## 🔧 Prerequisites
@@ -52,7 +52,7 @@ source flights_venv/bin/activate
 
 ### 2. Run the Scraper
 ```bash
-python copenhagen_antalya_scraper.py
+python copenhagen_auckland_scraper.py
 ```
 
 ## 📊 Output Files
@@ -62,18 +62,18 @@ The script generates organized output files:
 ### Screenshots
 ```
 screenshots/
-├── Copenhagen_to_Antalya_from_20251017_to_20251024_Afghanistan.png
-├── Copenhagen_to_Antalya_from_20251017_to_20251024_Germany.png
-└── Copenhagen_to_Antalya_from_20251017_to_20251024_Australia.png
+├── Copenhagen_to_Auckland_from_20251017_to_20251024_Afghanistan.png
+├── Copenhagen_to_Auckland_from_20251017_to_20251024_Germany.png
+└── Copenhagen_to_Auckland_from_20251017_to_20251024_Australia.png
 ```
 
 ### Price Data
 ```
 prices/
-├── Copenhagen_to_Antalya_direct_Afghanistan.csv
-├── Copenhagen_to_Antalya_direct_Germany.csv
-├── Copenhagen_to_Antalya_direct_Australia.csv
-└── Copenhagen_to_Antalya_consolidated_prices.csv  # Combined results
+├── Copenhagen_to_Auckland_direct_Afghanistan.csv
+├── Copenhagen_to_Auckland_direct_Germany.csv
+├── Copenhagen_to_Auckland_direct_Australia.csv
+└── Copenhagen_to_Auckland_consolidated_prices.csv  # Combined results
 ```
 
 ### CSV Structure
@@ -103,7 +103,7 @@ Each CSV contains:
 ### Fallback Currencies
 If EUR not found, tries:
 - **USD**: $50 - $5,000
-- **GBP**: £50 - £4,000  
+- **GBP**: £50 - £4,000
 - **DKK**: 400 - 35,000 DKK
 - **AFN**: 5,000 - 500,000 AFN (Afghanistan)
 - **kr**: 500 - 50,000 kr (Nordic countries)
@@ -174,7 +174,7 @@ return unique_countries[:5]  # Test only first 5 countries
 Update the `main()` function:
 ```python
 origin = "Copenhagen"        # Change departure city
-destination = "Antalya"      # Change destination
+destination = "Auckland"      # Change destination
 depart_date = "2025-10-17"   # Change departure date
 return_date = "2025-10-24"   # Change return date
 ```
@@ -185,7 +185,7 @@ Modify validation ranges in `extract_flight_prices()` function.
 ## 📈 Use Cases
 
 - **Price comparison** across different geographic markets
-- **Travel deal hunting** by leveraging regional pricing differences  
+- **Travel deal hunting** by leveraging regional pricing differences
 - **Market research** for flight pricing strategies
 - **Automated monitoring** of specific route pricing trends
 
