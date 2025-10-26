@@ -264,23 +264,20 @@ def apply_nonstop_filter(driver):
         driver.execute_script("arguments[0].click();", stops_filter)
         time.sleep(3)
 
-        # Find and click nonstop option
-        nonstop_selectors = [
-            "//div[contains(text(), 'Non-stop only')]",
-            "//div[contains(text(), 'Nonstop only')]",
-            "//span[contains(text(), 'Non-stop only')]",
-            "//span[contains(text(), 'Nonstop only')]",
-            "//label[contains(text(), 'Non-stop only')]",
-            "//label[contains(text(), 'Nonstop only')]"
+        # Find and click one or fewer stops option
+        stops_selectors = [
+            "//div[contains(text(), 'One stop or fewer')]",
+            "//span[contains(text(), 'One stop or fewer')]",
+            "//label[contains(text(), 'One stop or fewer')]"
         ]
 
-        for selector in nonstop_selectors:
+        for selector in stops_selectors:
             elements = driver.find_elements(By.XPATH, selector)
             if elements:
-                print(f"Found non-stop element with selector: {selector}")
+                print(f"Found stops element with selector: {selector}")
                 actions = ActionChains(driver)
                 actions.move_to_element(elements[0]).click().perform()
-                print("Clicked non-stop option")
+                print("Clicked stops option")
                 time.sleep(2)
 
                 # Apply the filter
@@ -289,11 +286,11 @@ def apply_nonstop_filter(driver):
                     try:
                         WebDriverWait(driver, 5).until(EC.element_to_be_clickable(done_buttons[0]))
                         actions.move_to_element(done_buttons[0]).click().perform()
-                        print("Applied non-stop filter")
+                        print("Applied one stop or fewer filter")
                     except:
                         try:
                             driver.execute_script("arguments[0].click();", done_buttons[0])
-                            print("Applied non-stop filter (JavaScript)")
+                            print("Applied one stop or fewer filter (JavaScript)")
                         except:
                             print("Could not click Done button")
                     time.sleep(3)
@@ -772,9 +769,9 @@ def main():
 
     # Define flight search parameters
     origin = "Copenhagen"
-    destination = "Antalya"
-    depart_date = "2025-10-17"
-    return_date = "2025-10-24"
+    destination = "Auckland"
+    depart_date = "2026-03-07"
+    return_date = "2026-03-20"
 
     print(f"Starting multi-country flight price comparison...")
     print(f"Route: {origin} to {destination}")
